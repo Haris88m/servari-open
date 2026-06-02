@@ -1,0 +1,2 @@
+{"type": "decision", "run_id": "run_demo_kept01", "ts": "2026-06-02T10:52:09+00:00", "decision": "KEEP", "baseline_scores": {"demo_quality": 3}, "after_scores": {"demo_quality": 4}, "reasons": ["demo_quality:improved(3->4)"], "restored_files": []}
+{"type": "decision", "run_id": "run_demo_reverted01", "ts": "2026-06-02T12:52:09+00:00", "decision": "REVERT", "baseline_scores": {"demo_quality": 5}, "after_scores": {"demo_quality": 1}, "reasons": ["demo_quality:degraded(5->1,hib=True)"], "restored_files": ["demo-data/sample-target.txt"]}

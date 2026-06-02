@@ -1,0 +1,9 @@
+{
+  "_doc": "Demo inbox triage cache for the Inbox tab. Synthetic threads — replace with your own triage output.",
+  "last_triage": "2026-06-02T08:00:00Z",
+  "threads": [
+    { "from": "recruiter@example.com", "subject": "Re: Senior Frontend role", "age_str": "2h", "priority": "high", "thread_id": "t-001" },
+    { "from": "team@acme.example", "subject": "Interview scheduling", "age_str": "6h", "priority": "medium", "thread_id": "t-002" },
+    { "from": "newsletter@example.com", "subject": "Weekly digest", "age_str": "1d", "priority": "low", "thread_id": "t-003" }
+  ]
+}

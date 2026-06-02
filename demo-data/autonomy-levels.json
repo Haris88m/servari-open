@@ -1,0 +1,10 @@
+{
+  "_doc": "Per-agent autonomy levels (L0 suggest-only .. L5 full-auto). The operator owns this dial. Default L2 when an agent is absent.",
+  "default_level": 2,
+  "levels": {
+    "builder": 2,
+    "researcher": 3,
+    "reviewer": 2,
+    "scheduler": 4
+  }
+}

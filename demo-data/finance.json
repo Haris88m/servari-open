@@ -1,0 +1,12 @@
+{
+  "_doc": "Demo finance summary for the Finance tab. Synthetic figures only — NO real client or revenue data.",
+  "mtd_revenue_eur": 12500,
+  "mtd_expenses_eur": 4200,
+  "mtd_net_eur": 8300,
+  "outstanding_eur": 3000,
+  "as_of_iso": "2026-06-01T00:00:00Z",
+  "invoices": [
+    { "inv_id": "INV-0001", "client": "Acme", "amount_eur": 1800, "due_str": "in 5 days" },
+    { "inv_id": "INV-0002", "client": "Demo CRM", "amount_eur": 1200, "due_str": "overdue 2 days" }
+  ]
+}

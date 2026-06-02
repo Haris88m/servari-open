@@ -1,0 +1,5 @@
+{"turn": 1, "from": "user", "text": "Hey SERVARI — what can you do?", "ts": "2026-06-02T13:55:54+00:00"}
+{"turn": 2, "from": "servari", "text": "I'm the operating-system shell. Bring your own model, set an autonomy level per agent, and I'll run the agent workspace. Ask me anything, or open the Agents view to watch them work.", "ts": "2026-06-02T13:55:54+00:00"}
+{"turn": 3, "from": "user", "text": "Show me the demo agents.", "ts": "2026-06-02T13:58:54+00:00"}
+{"turn": 4, "from": "servari", "text": "Four demo agents are online: builder, researcher, reviewer, and scheduler. Their channels are populated under demo-data/agents/. Open the grid to see each one's recent turns.", "ts": "2026-06-02T13:59:54+00:00"}
+{"turn": 5, "from": "user", "text": "Great. I'll wire my own model in config.json next.", "ts": "2026-06-02T14:00:54+00:00"}

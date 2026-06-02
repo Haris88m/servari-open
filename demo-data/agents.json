@@ -1,0 +1,9 @@
+{
+  "_doc": "Neutral demo agent roster for the health surface's agent count.",
+  "agents": [
+    { "id": "builder", "name": "Build Agent" },
+    { "id": "researcher", "name": "Research Agent" },
+    { "id": "reviewer", "name": "Review Agent" },
+    { "id": "scheduler", "name": "Scheduling Agent" }
+  ]
+}

@@ -1,0 +1,5 @@
+{"session": "demo-session-01", "model": "sonnet", "timestamp": "2026-06-02T09:01:54+00:00", "usage": {"input_tokens": 12000, "output_tokens": 3400, "cache_creation_input_tokens": 8000, "cache_read_input_tokens": 41000}}
+{"session": "demo-session-01", "model": "sonnet", "timestamp": "2026-06-02T10:01:54+00:00", "usage": {"input_tokens": 9800, "output_tokens": 2600, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 52000}}
+{"session": "demo-session-02", "model": "haiku", "timestamp": "2026-06-02T12:01:54+00:00", "usage": {"input_tokens": 4200, "output_tokens": 1100, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 18000}}
+{"session": "demo-session-03", "model": "opus", "timestamp": "2026-06-02T13:41:54+00:00", "usage": {"input_tokens": 15400, "output_tokens": 5200, "cache_creation_input_tokens": 12000, "cache_read_input_tokens": 88000}}
+{"session": "demo-session-03", "model": "opus", "timestamp": "2026-06-02T13:56:54+00:00", "usage": {"input_tokens": 6100, "output_tokens": 2900, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 95000}}

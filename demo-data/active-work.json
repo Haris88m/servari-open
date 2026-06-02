@@ -1,0 +1,7 @@
+{
+  "work_id": 7,
+  "title": "Wire the BYOM chat backend",
+  "status": "in progress — drafting the provider-agnostic call",
+  "next_action": "validate the model name before the first request",
+  "session": "S001"
+}

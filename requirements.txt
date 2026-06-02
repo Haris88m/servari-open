@@ -1,0 +1,12 @@
+# SERVARI OS — Python dependencies
+#
+# The shell server (server/) is PURE STDLIB. It needs ZERO third-party packages
+# to run — Python 3.9+ is enough. `pip install -r requirements.txt` is therefore
+# only needed if you want the OPTIONAL local voice backends.
+#
+# --- OPTIONAL: local voice (speech-to-text + neural text-to-speech) ---
+# Uncomment to enable the /api/voice-* endpoints. The shell degrades gracefully
+# without them (voice routes report "unavailable"; everything else works).
+#
+# faster-whisper        # local speech-to-text (STT)
+# piper-tts             # local neural text-to-speech (TTS)

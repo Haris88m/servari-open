@@ -1,0 +1,14 @@
+{
+  "_doc": "Services + channel index for /api/state + the health surface. Demo values; replace with your own service roster.",
+  "health": {
+    "roster": { "services": 4 },
+    "integration": { "connected": 4, "disconnected": 0, "verdict": "ALL CONNECTED" }
+  },
+  "channels": {
+    "builder": { "turns": 3, "owes": "" },
+    "researcher": { "turns": 3, "owes": "" },
+    "reviewer": { "turns": 2, "owes": "" },
+    "scheduler": { "turns": 2, "owes": "" }
+  },
+  "open_gates": []
+}

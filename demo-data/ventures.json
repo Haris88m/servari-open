@@ -1,0 +1,9 @@
+{
+  "_doc": "Demo ventures for the VentureStrip. Replace with your own. Each: {name, status, note}.",
+  "ventures": [
+    { "name": "Acme", "status": "active", "note": "Flagship demo product" },
+    { "name": "Demo CRM", "status": "active", "note": "Sales pipeline app" },
+    { "name": "Northwind", "status": "paused", "note": "Logistics dashboard" },
+    { "name": "Helios", "status": "planning", "note": "Analytics platform" }
+  ]
+}

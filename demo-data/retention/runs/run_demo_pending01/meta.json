@@ -1,0 +1,25 @@
+{
+  "run_id": "run_demo_pending01",
+  "ts": "2026-06-02T13:27:09+00:00",
+  "targets": [
+    "demo-data/sample-target.txt"
+  ],
+  "path_map": {
+    "demo-data/sample-target.txt": "demo-data/retention/runs/run_demo_pending01/snapshot/demo-data__sample-target.txt"
+  },
+  "metric_ids": [
+    "demo_quality"
+  ],
+  "unknown_metrics": [],
+  "baseline_scores": {
+    "demo_quality": 3
+  },
+  "baseline_detail": {
+    "demo_quality": {
+      "ok": true,
+      "error": null
+    }
+  },
+  "snapshot_errors": [],
+  "decided": false
+}

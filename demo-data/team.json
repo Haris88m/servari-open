@@ -1,0 +1,19 @@
+{
+  "_doc": "Demo org chart + comms matrix for /api/org (OrgChart). Replace with your own roster. is_human:true keeps a node's real name; all other labels pass the display seal.",
+  "org_chart": [
+    { "name": "Operator", "role": "Operator", "reports_to": null, "is_human": true, "manages": ["Orchestrator"] },
+    { "name": "Orchestrator", "role": "Orchestrator", "reports_to": "Operator", "manages": ["builder", "researcher", "reviewer", "scheduler"] },
+    { "name": "builder", "role": "Build Agent", "reports_to": "Orchestrator" },
+    { "name": "researcher", "role": "Research Agent", "reports_to": "Orchestrator" },
+    { "name": "reviewer", "role": "Review Agent", "reports_to": "Orchestrator" },
+    { "name": "scheduler", "role": "Scheduling Agent", "reports_to": "Orchestrator" }
+  ],
+  "comms_matrix": {
+    "Orchestrator": { "talks_to": ["builder", "researcher", "reviewer", "scheduler"] },
+    "researcher": { "talks_to": ["reviewer"] },
+    "builder": { "talks_to": ["reviewer"] }
+  },
+  "reporting_chain": {
+    "rule": "The Operator speaks to the Orchestrator; the Orchestrator runs the agents."
+  }
+}

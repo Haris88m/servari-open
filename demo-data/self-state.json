@@ -1,0 +1,7 @@
+{
+  "_doc": "Cached self-state receipt for the health surface's gauge check. Demo values.",
+  "heartbeat": "RUNNING",
+  "gauge_errors": [],
+  "roster": { "services": 4 },
+  "integration": { "verdict": "ALL CONNECTED" }
+}
