@@ -13,12 +13,12 @@ SERVARI is the *shell and control plane*: a React desktop/web UI over a small Py
 
 ---
 
-## What this repo proves
+## What this repo covers
 
-This source repository proves the public shell/control-plane scope:
+This source repository covers the public shell/control-plane scope:
 
 - local server on `127.0.0.1` by default,
-- React UI that renders from bundled synthetic demo data,
+- React UI intended to render from bundled synthetic demo data,
 - OpenAI-compatible BYOM chat interface,
 - no-config BYOM behavior that refuses to fabricate a model reply,
 - L0-L5 autonomy decision policy,
@@ -26,7 +26,10 @@ This source repository proves the public shell/control-plane scope:
 - append-only fast-verify queue,
 - allow-listed action runner, not a raw shell,
 - metric-gated retention loop with KEEP/REVERT self-test,
-- selected API routes that return HTTP 200 JSON in smoke verification.
+- selected API routes that return HTTP 200 JSON in smoke verification,
+- secret/provider config patterns gitignored.
+
+The automated proof is `scripts/verify_all.py`. It mechanically verifies 8 checks: autonomy hard gate, invalid-score fail-closed behavior, append-only verify queue, BYOM no-config honesty, retention self-test, action allow-list, server smoke routes, and secret gitignore patterns. UI rendering is verified by source inspection, screenshots, local build, and the CI UI build job; the verification harness does not perform browser automation.
 
 Run the proof:
 
@@ -52,6 +55,7 @@ This repo does **not** claim to be:
 - a new or secret foundation model,
 - better than frontier systems,
 - fully sovereign from all hosted models,
+- fully autonomous by itself; a human stays in the loop and high-risk work always parks in the append-only verification queue,
 - a production multi-agent swarm execution engine by itself,
 - third-party certified,
 - safe to expose to the public internet without an authentication/reverse-proxy layer.
