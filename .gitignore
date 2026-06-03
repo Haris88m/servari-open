@@ -26,6 +26,9 @@ _tts_models/
 _tts_cache/
 *.wav
 
+# --- verification artifacts written by scripts/verify_all.py ---
+verification/
+
 # --- runtime demo state written by the running shell ---
 demo-data/context/audit.jsonl
 demo-data/_voice_debug.jsonl
