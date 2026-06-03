@@ -4,7 +4,7 @@ REM  SERVARI - portable Windows .exe builder
 REM  Produces: dist-exe\SERVARI-x64.exe
 REM
 REM  NOTE: the .exe is the Electron shell ONLY. The SERVARI server
-REM  (server/servari_server.py) is spawned from the repo at runtime
+REM  (server/servari_server.py) is launched from the repo at runtime
 REM  and is NOT bundled. The .exe still needs Python at runtime
 REM  ("python" on PATH, or set SERVARI_PYTHON to a specific exe).
 REM ============================================================

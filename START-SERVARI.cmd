@@ -4,7 +4,7 @@ REM  SERVARI - launch the desktop shell (Electron window over
 REM  the local SERVARI server).
 REM
 REM  Run from the repo root. The server (server/servari_server.py)
-REM  is spawned automatically by the Electron entry; it needs
+REM  is launched automatically by the Electron entry; it needs
 REM  Python on PATH (or set SERVARI_PYTHON to a specific exe).
 REM ============================================================
 title SERVARI

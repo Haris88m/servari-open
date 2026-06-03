@@ -104,7 +104,7 @@ all panels render from the bundled demo data.
 
 ```bash
 npm install     # at the repo root — installs Electron + electron-builder
-npm start       # opens the SERVARI window (it spawns the server for you)
+npm start       # opens the SERVARI window (it starts the server for you)
 ```
 
 Build a portable Windows `.exe`:
@@ -113,7 +113,7 @@ Build a portable Windows `.exe`:
 npm run build:exe      # -> dist-exe/SERVARI-x64.exe
 ```
 
-The `.exe` is the window only; it spawns `server/servari_server.py` at runtime, so
+The `.exe` is the window only; it starts `server/servari_server.py` at runtime, so
 Python must be on `PATH` (or set `SERVARI_PYTHON` to a specific interpreter).
 
 ## 6. (Optional) Local voice

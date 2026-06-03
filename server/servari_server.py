@@ -202,6 +202,22 @@ def _append(p: Path, who: str, text: str):
     return True
 
 
+def _append_error(p: Path, text: str):
+    """Append a SERVARI turn flagged as an error so the chat UI renders it
+    visibly distinct (amber). Same shape as _append + 'error': True. Keeps the
+    'from' as 'servari' so BYOM role-mapping treats it as an assistant turn."""
+    text = (text or "").strip()
+    if not text:
+        return False
+    turns = _turns(p)
+    turn = {"turn": len(turns) + 1, "from": "servari", "text": text, "error": True,
+            "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")}
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(turn) + "\n")
+    return True
+
+
 def _run_action(name: str):
     fn = ACTIONS.get(name)
     if not fn:
@@ -676,11 +692,20 @@ class H(BaseHTTPRequestHandler):
                             _append(CHAN, "servari", r["text"])
                             reply_info = {"replied": True, "model": r.get("model", "")}
                         else:
-                            reply_info = {"replied": False, "error": r.get("error", "")}
+                            err = r.get("error", "") or "the model returned no reply"
+                            # Surface the failure IN the channel so the chat UI shows
+                            # an honest error bubble instead of going silent (QA HIGH-1).
+                            _append_error(CHAN, "Model call failed: " + str(err) +
+                                          ". Check your provider key in Settings.")
+                            reply_info = {"replied": False, "error": err}
                     else:
+                        reason = status.get("reason", "") or "no model wired"
+                        _append_error(CHAN, "No model is wired yet. " + str(reason))
                         reply_info = {"replied": False, "configured": False,
-                                      "reason": status.get("reason", "")}
+                                      "reason": reason}
             except Exception as e:
+                _append_error(CHAN, "Model call failed: " + type(e).__name__ +
+                              ". Check your provider key in Settings.")
                 reply_info = {"replied": False, "error": f"{type(e).__name__}"}
             self._send(200, json.dumps({"ok": True, "byom": reply_info}))
         elif u.path == "/api/agent-say":

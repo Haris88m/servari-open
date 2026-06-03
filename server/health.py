@@ -143,6 +143,14 @@ def _check_gate_queue() -> dict:
     leaves a resolved entry counted forever and flips the shell to a false DEGRADED.
     verify_queue.list_pending() owns that reconciliation rule; reuse it (single source of
     truth). Fail-closed: if it can't be imported, degrade THIS check to UNKNOWN, never crash.
+
+    DESIGN: a pending gate is NORMAL OPERATION, not a system degradation. Gates exist
+    precisely to HOLD an action for human approval — an awaiting-approval action is the
+    queue doing its job, not a fault. So a pending gate keeps THIS check OK and reports the
+    count as an informational `pending` field (surfaced as `pending_gates` at the top level).
+    Health reflects SYSTEM health (server up, data readable, model wired-or-honestly-unwired),
+    NOT WORKFLOW state (approvals in flight). The only DEGRADED condition here would be a
+    genuine queue fault — and an unreadable/unparseable queue already degrades to UNKNOWN above.
     """
     try:
         if not GATE_QUEUE.is_file():
@@ -168,9 +176,11 @@ def _check_gate_queue() -> dict:
             return {"status": UNKNOWN, "total": total,
                     "note": f"verify_queue reconcile unavailable: {type(e).__name__}"}
 
-        # Real pending (someone is waiting on a gate) is a reliability signal -> DEGRADED.
-        status = DEGRADED if pending > 0 else OK
-        return {"status": status, "pending": pending, "total": total}
+        # A pending gate is normal operation (the queue holding an action for approval),
+        # NOT a system degradation. The check stays OK; the count is informational.
+        note = (f"{pending} approval(s) awaiting a human decision (normal operation)"
+                if pending > 0 else "no approvals awaiting a decision")
+        return {"status": OK, "pending": pending, "total": total, "note": note}
     except Exception as e:
         return {"status": UNKNOWN, "note": f"read/parse failed: {type(e).__name__}"}
 
@@ -257,13 +267,22 @@ def health_check() -> dict:
     else:
         verdict = OK
 
+    # Approvals-in-flight is WORKFLOW state, not system health. Surface it as its own
+    # top-level counter so the operator sees it WITHOUT it ever flipping the verdict red.
+    # (`pending` is None when the queue is missing/unreadable; coerce that to 0 here.)
+    gq = checks.get("gate_queue", {}) or {}
+    _pending = gq.get("pending")
+    pending_gates = _pending if isinstance(_pending, int) else 0
+
     summary = (
         f"{n_ok} OK / {n_degraded} DEGRADED / {n_unknown} UNKNOWN "
         f"across {len(checks)} checks"
+        + (f"; {pending_gates} gate(s) pending approval" if pending_gates > 0 else "")
     )
 
     return {
         "verdict": verdict,
+        "pending_gates": pending_gates,
         "ts_note": "point-in-time read of the state files; fast, no subprocess",
         "checks": checks,
         "summary": summary,

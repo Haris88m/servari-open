@@ -1,0 +1,25 @@
+SERVARI OS
+Copyright 2026 The SERVARI OS Project
+
+This product includes software developed for the SERVARI OS project.
+
+Licensed under the Apache License, Version 2.0 (the "License").
+You may obtain a copy of the License in the accompanying LICENSE file or at
+http://www.apache.org/licenses/LICENSE-2.0.
+
+---
+
+The SERVARI OS shell server is pure Python standard library and requires no
+third-party packages to run.
+
+The React user interface (under ui/) is built with third-party open-source
+packages declared in ui/package.json; each is distributed under its own
+license (predominantly MIT). Their full license texts are reproduced in the
+respective package directories under ui/node_modules/ after `npm install`.
+
+The optional desktop shell uses Electron and electron-builder, declared in the
+root package.json under their own licenses.
+
+The optional local-voice integration references faster-whisper and piper-tts,
+which are downloaded by the operator at their own discretion under their own
+licenses; they are not bundled with this repository.

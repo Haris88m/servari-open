@@ -10,10 +10,9 @@ the chat, the agent grid, the org chart, the gate queue, the autonomy dials, the
 health/context/token panels — and wires it to **your** model. The intelligence is
 yours to plug in; the shell is what you see and control.
 
-> Inspired by the emerging "agentic OS" pattern — sibling open projects include
-> [OpenClaw](https://github.com/) and [Hermes](https://github.com/). SERVARI's
-> angle is the **shell + the gates**: a polished workspace where autonomy is a
-> dial you control and every irreversible action passes a human gate.
+> Inspired by the emerging "agentic OS" pattern that several open projects share.
+> SERVARI's angle is the **shell + the gates**: a polished workspace where autonomy
+> is a dial you control and every irreversible action passes a human gate.
 
 ---
 
@@ -92,12 +91,87 @@ from the bundled demo data immediately.
 
 ```bash
 npm install            # at the repo root (installs Electron)
-npm start              # opens the SERVARI window (spawns the server for you)
+npm start              # opens the SERVARI window (starts the server for you)
 # or build a portable Windows .exe:
 npm run build:exe      # -> dist-exe/SERVARI-x64.exe   (Windows; needs Python on PATH)
 ```
 
 On Windows you can also just double-click `START-SERVARI.cmd`.
+
+---
+
+## Two ways to run it
+
+SERVARI has two front doors. Use whichever fits your workflow.
+
+### 1. The app
+
+The desktop / web shell — the full UI with the agent grid, gates, and panels.
+
+```bash
+# desktop window (Windows)
+servari.cmd app                 # or double-click START-SERVARI.cmd
+# or the built portable .exe (npm run build:exe)
+# or just the web shell:
+python server/servari_server.py # -> http://127.0.0.1:8911/
+```
+
+### 2. The CLI — a full interactive SERVARI session in your terminal
+
+This is SERVARI as a **persistent, interactive agent session in the terminal** —
+the way a power user runs an agent OS. You bring the harness; SERVARI is the boot
+persona that the session loads from [`SERVARI.md`](./SERVARI.md). Pick the backend
+that matches your workflow:
+
+| Backend | The session you get | Requirement |
+|---|---|---|
+| `claude` | a live interactive Claude Code CLI session, booted as SERVARI | `claude` on PATH; sign in once with `claude` |
+| `codex` | a live interactive OpenAI Codex CLI session, booted as SERVARI | `codex` on PATH; sign in once with `codex` |
+| `api` | SERVARI's own interactive terminal chat over your BYOM endpoint | `config.json` with `base_url` + `model` |
+
+```bash
+# start an interactive SERVARI session (auto-detects the best available backend)
+servari.cmd cli
+
+# force a specific backend
+servari.cmd cli --backend claude   # interactive Claude Code CLI session as SERVARI
+servari.cmd cli --backend codex    # interactive OpenAI Codex CLI session as SERVARI
+servari.cmd cli --backend api      # interactive BYOM chat as SERVARI (config.json)
+
+# one-shot (no session, prints one reply) — uses the API backend
+servari.cmd cli -p "what is SERVARI?"
+
+# see the exact session launch command, without starting it
+servari.cmd cli --print-cmd
+
+# see what's available on this machine
+servari.cmd cli --detect
+```
+
+**How it boots as SERVARI.** When you start the session, SERVARI hands control to
+your harness *in the repo directory* with an opening instruction to read
+`SERVARI.md` and operate as SERVARI for the whole session — the harness picks up
+`SERVARI.md` (and `AGENTS.md`) from the working dir, and from there it is a normal
+interactive session in that tool. Exit the session to return. For the `api`
+backend there is no third-party TUI, so SERVARI's own terminal chat loop **is** the
+session, and it loads `SERVARI.md` as its system line when present.
+
+The CLI auto-detects: if the Claude CLI is installed it uses that, otherwise it
+falls back to the direct BYOM API. A missing backend is reported plainly with how
+to install it, and the other backends are offered. The API backend calls SERVARI's
+chat directly — it does **not** start the HTTP server, so there is no port conflict.
+
+Without `servari.cmd` (or on non-Windows), call the program directly:
+
+```bash
+python server/servari_cli.py                 # interactive SERVARI session (auto)
+python server/servari_cli.py --detect
+python server/servari_cli.py --print-cmd     # show the session launch command
+python server/servari_cli.py --backend api -p "what is SERVARI?"
+```
+
+Add the repo root to your `PATH` to drop the `.cmd` and the `cli` token is the only
+extra word you type.
 
 ---
 
@@ -166,6 +240,16 @@ your own directory with the same shapes.
 
 ---
 
+## Contributing & security
+
+- **Contributing:** see [CONTRIBUTING.md](./CONTRIBUTING.md) — how to file issues,
+  propose changes, and the one rule that matters (keep it runnable for a stranger).
+- **Security:** found a vulnerability? Please **do not** open a public issue — see
+  [SECURITY.md](./SECURITY.md) for private disclosure.
+
+---
+
 ## License
 
-[MIT](./LICENSE) © Haris Mekic
+[Apache License 2.0](./LICENSE) © The SERVARI OS Project. See [NOTICE](./NOTICE) for
+third-party attributions.

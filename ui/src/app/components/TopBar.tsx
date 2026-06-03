@@ -145,7 +145,7 @@ export function TopBar({ activeAppName, onProcessTableClick }: TopBarProps) {
     let alive = true;
     const load = async () => {
       try {
-        const [state, ctx] = await Promise.all([API.state(), API.context()]);
+        const [state, ctx, vq] = await Promise.all([API.state(), API.context(), API.verifyQueue()]);
         if (!alive) return;
         const h = state.health || {};
         setHealthDots([
@@ -154,9 +154,11 @@ export function TopBar({ activeAppName, onProcessTableClick }: TopBarProps) {
           { status: dotStatus(h.integration), tooltip: "Integration" },
         ]);
         setPressure(readPressure(ctx.pressure?.pressure as number | string | undefined));
-        // count open gates from state
-        const openGates = (state as unknown as { open_gates?: unknown[] }).open_gates ?? [];
-        setGateCount(openGates.length);
+        // Gate count: single source of truth = verify_queue.list_pending()
+        // (same reconciliation /api/health and the status bar use). The stale
+        // nervous-system.json open_gates list is NOT used — it disagreed with
+        // the live queue and produced the header-vs-status-bar mismatch.
+        setGateCount((vq.pending ?? []).length);
       } catch { /* keep last */ }
     };
     load();

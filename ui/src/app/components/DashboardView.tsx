@@ -604,8 +604,12 @@ export function DashboardView() {
 
   const verifyPending = verify?.pending ?? [];
   const retentionPending = retention?.pending ?? [];
-  const openGates = state?.open_gates ?? [];
-  const gatesPending = verifyPending.length + retentionPending.length;
+  // The "GATES" counter has ONE source of truth: verify_queue.list_pending()
+  // (exposed at /api/verify-queue and reconciled identically in server/health.py).
+  // Retention runs are a SEPARATE queue with their own RETAIN concept — folding
+  // them in here is what made the status bar (2) disagree with /api/verify-queue (1).
+  // The stale nervous-system.json open_gates list is no longer counted as a gate.
+  const gatesPending = verifyPending.length;
 
   const rawPressure = context?.pressure?.pressure;
   const pressureWord = readPressure(rawPressure);
@@ -648,17 +652,9 @@ export function DashboardView() {
         : `Retention run ${i + 1}`;
     priorityItems.push({ id: `ret-${i}`, label: sealLabel(txt) || txt, tag: "RETAIN" });
   });
-  openGates.slice(0, 2).forEach((gate, i) => {
-    const txt =
-      typeof gate === "object" && gate !== null
-        ? String(
-            (gate as Record<string, unknown>).summary ||
-              (gate as Record<string, unknown>).gate ||
-              `Open gate ${i + 1}`,
-          )
-        : `Open gate ${i + 1}`;
-    priorityItems.push({ id: `og-${i}`, label: sealLabel(txt) || txt, tag: "OPEN" });
-  });
+  // GATE priority items come ONLY from the verify-queue (the single source of truth
+  // above). The legacy nervous-system.json open_gates list is intentionally NOT
+  // surfaced here — it disagreed with the live queue and double-counted gates.
   // All real sources empty — single honest state (no fake MAINT/COST items).
   if (priorityItems.length === 0) {
     priorityItems.push({ id: "sys-clear", label: "No priority items — all queues clear", tag: "INFO" });

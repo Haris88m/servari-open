@@ -126,7 +126,7 @@ const MAX_TTS_CHARS = 600;
  * lowered 0.08 -> 0.035. the user's mic never crossed 0.08 so
  * the VAD never locked speech and nothing ever sent — silently. */
 const VAD_SPEECH_LEVEL = 0.035;
-/** Continuous ms above VAD_SPEECH_LEVEL before we lock in "speech has started". */
+/** Continuous ms above VAD_SPEECH_LEVEL before we confirm "speech has started". */
 const VAD_SPEECH_MS = 300;
 /** Amplitude (0..1) below which we consider the user silent.
  * lowered 0.05 -> 0.025 to match the lowered speech level. */

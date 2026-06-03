@@ -17,6 +17,9 @@ venv/
 
 # --- BYOM secret config (NEVER commit a key) ---
 config.json
+.env
+.env.*
+*.env
 
 # --- voice models + synthesized audio (downloaded / generated on first run) ---
 _tts_models/
@@ -28,6 +31,9 @@ demo-data/context/audit.jsonl
 demo-data/_voice_debug.jsonl
 demo-data/reports/*_session_*.md
 demo-data/reports/*_today.md
+# dated all-time reports are per-run artifacts; keep only the one curated demo report
+demo-data/reports/*_all_time.md
+!demo-data/reports/2026-06-01_0900_all_time.md
 
 # --- logs ---
 *.log

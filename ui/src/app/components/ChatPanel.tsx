@@ -207,6 +207,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
             {messages.map((msg, i) => {
               const isOp =
                 msg.from === "user" || msg.from === "operator";
+              const isError = msg.error === true;
               return (
                 <motion.div
                   key={i}
@@ -221,9 +222,18 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
                       maxWidth: "60%",
                       padding: "8px 12px",
                       borderRadius: isOp ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
-                      background: isOp ? "rgba(20,156,150,0.12)" : "var(--s-panel)",
+                      background: isError
+                        ? "rgba(217,119,6,0.10)"
+                        : isOp
+                          ? "rgba(20,156,150,0.12)"
+                          : "var(--s-panel)",
+                      border: isError ? "1px solid rgba(217,119,6,0.55)" : undefined,
                       fontSize: "var(--t-13)",
-                      color: isOp ? "var(--s-text-primary)" : "var(--s-text-secondary)",
+                      color: isError
+                        ? "#f59e0b"
+                        : isOp
+                          ? "var(--s-text-primary)"
+                          : "var(--s-text-secondary)",
                       lineHeight: 1.5,
                       fontFamily: "var(--font-mono)",
                     }}

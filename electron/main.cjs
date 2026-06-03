@@ -1,5 +1,5 @@
 // SERVARI — the operating system shell (Electron entry).
-// The exe is the WINDOW; the shell server (server/servari_server.py) is SPAWNED
+// The exe is the WINDOW; the shell server (server/servari_server.py) is LAUNCHED
 // from the project at runtime (not bundled). Home-resolution is robust for the
 // packaged portable exe, whose __dirname points at a temp extraction dir — it
 // finds the real project via env var, then the dev-relative path.
@@ -10,8 +10,8 @@ const fs = require("fs");
 const http = require("http");
 
 // Bind address mirrors the server's env config (SERVARI_HOST / SERVARI_PORT),
-// so the window targets the same address the spawned server binds to. Defaults
-// to localhost:8911. The spawned server inherits this process's env.
+// so the window targets the same address the launched server binds to. Defaults
+// to localhost:8911. The launched server inherits this process's env.
 const HOST = (process.env.SERVARI_HOST || "").trim() || "127.0.0.1";
 const PORT = (() => {
   const raw = (process.env.SERVARI_PORT || "").trim();

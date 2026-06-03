@@ -22,6 +22,9 @@ export interface Turn {
   from: string;
   text: string;
   ts?: number | string;
+  // Set by the server when a model call fails so the chat UI can render the
+  // turn as a visibly-distinct error bubble instead of going silent.
+  error?: boolean;
 }
 
 export interface Health {

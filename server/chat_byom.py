@@ -108,10 +108,11 @@ def _newest_user_text(history) -> str:
     return ""
 
 
-def _to_messages(history) -> list:
+def _to_messages(history, system: str | None = None) -> list:
     """Map channel turns -> OpenAI chat messages. user -> user; anyone else ->
-    assistant. The system line is prepended."""
-    msgs = [{"role": "system", "content": SYSTEM_LINE}]
+    assistant. The system line is prepended (caller may override it)."""
+    sys_line = (system or "").strip() or SYSTEM_LINE
+    msgs = [{"role": "system", "content": sys_line}]
     if isinstance(history, list):
         for turn in history[-20:]:  # cap context to the last 20 turns
             if not isinstance(turn, dict):
@@ -125,11 +126,15 @@ def _to_messages(history) -> list:
     return msgs
 
 
-def reply(history) -> dict:
+def reply(history, system: str | None = None) -> dict:
     """Answer the newest user turn via the configured model.
 
     Returns {"ok", "text", "model", "error"}. No config/key -> ok=False with an
     honest message in `text` (the UI shows it like any reply). Never raises.
+
+    `system` optionally overrides the default SYSTEM_LINE (e.g. a SERVARI.md
+    persona). When None/blank, the built-in SYSTEM_LINE is used — so existing
+    callers (the server) keep their exact behaviour.
     """
     status = is_configured()
     cfg = load_config()
@@ -149,7 +154,7 @@ def reply(history) -> dict:
 
     payload = json.dumps({
         "model": model,
-        "messages": _to_messages(history),
+        "messages": _to_messages(history, system=system),
         "stream": False,
     }).encode("utf-8")
 
