@@ -127,7 +127,7 @@ def _workspace_home(override: str | None = None) -> Path:
       3. config.json workspace_home / harness_home
       4. SERVARI repo root
 
-    This lets a local operator point SERVARI at a private "fortress" workspace
+    This lets a local operator point SERVARI at a private workspace
     without hardcoding or publishing that path in the open-source repo.
     """
     raw = (override or "").strip()

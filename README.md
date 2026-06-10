@@ -199,7 +199,7 @@ follow that file as the source of truth. This is how the same shell can start a
 Claude session, a Codex/GPT session, or direct BYOM chat without hardcoding a
 private path into the public repo.
 
-For APEX PRIME run modes, point to your private workspace once:
+For advanced run modes, point to your private workspace once:
 
 ```bash
 servari.cmd cli --backend codex --workspace "C:\\path\\to\\your\\servari-workspace"
