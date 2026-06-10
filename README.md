@@ -1,18 +1,66 @@
 # SERVARI OS
 
-**An open-source AI operating-system shell.** Bring your own model, dial in how
-much autonomy each agent gets, talk to it by voice or text, and watch a live
-agent workspace — all running locally on your machine.
+[![SERVARI verification](https://github.com/Haris88m/servari-open/actions/workflows/ci.yml/badge.svg)](https://github.com/Haris88m/servari-open/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
+![BYOM](https://img.shields.io/badge/BYOM-OpenAI--compatible-lightgrey)
+![Local-first](https://img.shields.io/badge/local--first-127.0.0.1-lightgrey)
 
-SERVARI OS is the *shell*: a clean React desktop UI over a tiny, dependency-free
-Python server. It gives you the operating-system surface for an agent workforce —
-the chat, the agent grid, the org chart, the gate queue, the autonomy dials, the
-health/context/token panels — and wires it to **your** model. The intelligence is
-yours to plug in; the shell is what you see and control.
+**SERVARI OS is an open-source, local-first BYOM agentic OS shell.** It gives operators a controlled workspace for AI agents: chat, agent grid, autonomy dials, human verification queue, fail-closed health, token tracking, and metric-gated retention — all running locally.
 
-> Inspired by the emerging "agentic OS" pattern that several open projects share.
-> SERVARI's angle is the **shell + the gates**: a polished workspace where autonomy
-> is a dial you control and every irreversible action passes a human gate.
+SERVARI is the *shell and control plane*: a React desktop/web UI over a small Python standard-library server. The intelligence is your chosen model, wired through an OpenAI-compatible endpoint. The shell is what you see, control, verify, and audit.
+
+> Accurate public claim: SERVARI is an open-source, local-first BYOM agentic OS shell with mechanical autonomy gates, an append-only human verification queue, file-backed state, fail-closed health surfaces, and a metric-gated retention loop.
+
+---
+
+## What this repo covers
+
+This source repository covers the public shell/control-plane scope:
+
+- local server on `127.0.0.1` by default,
+- React UI intended to render from bundled synthetic demo data,
+- OpenAI-compatible BYOM chat interface,
+- no-config BYOM behavior that refuses to fabricate a model reply,
+- L0-L5 autonomy decision policy,
+- high-risk work queues even at L5,
+- append-only fast-verify queue,
+- allow-listed action runner, not a raw shell,
+- metric-gated retention loop with KEEP/REVERT self-test,
+- selected API routes that return HTTP 200 JSON in smoke verification,
+- secret/provider config patterns gitignored.
+
+The automated proof is `scripts/verify_all.py`. It mechanically verifies 8 checks: autonomy hard gate, invalid-score fail-closed behavior, append-only verify queue, BYOM no-config honesty, retention self-test, action allow-list, server smoke routes, and secret gitignore patterns. UI rendering is verified by source inspection, screenshots, local build, and the CI UI build job; the verification harness does not perform browser automation.
+
+Run the proof:
+
+```bash
+python scripts/verify_all.py
+```
+
+Expected summary:
+
+```text
+result: PASS (8/8)
+```
+
+The full machine-readable report is written to `verification/last-run.json`.
+
+---
+
+## What this repo does not claim
+
+This repo does **not** claim to be:
+
+- AGI,
+- a new or secret foundation model,
+- better than frontier systems,
+- fully sovereign from all hosted models,
+- fully autonomous by itself; a human stays in the loop and high-risk work always parks in the append-only verification queue,
+- a production multi-agent swarm execution engine by itself,
+- third-party certified,
+- safe to expose to the public internet without an authentication/reverse-proxy layer.
+
+The multi-agent workspace surface is present. A concurrent autonomous execution engine is not claimed as shipped in this repo.
 
 ---
 
@@ -34,28 +82,13 @@ See [`./docs/screenshots/`](./docs/screenshots/) for the full set.
 
 ## What you get
 
-- **Bring your own model (BYOM).** Point SERVARI at any OpenAI-compatible chat
-  endpoint — OpenAI, OpenRouter, Together, or a fully local server like Ollama,
-  LM Studio, or vLLM. Your key lives in a gitignored `config.json`; SERVARI never
-  ships or transmits a key anywhere but your chosen provider.
-- **Gate-controlled autonomy.** A per-agent dial from **L0** (suggest only) to
-  **L5** (full auto). The dial widens what an agent may do silently — but a
-  high-risk action (deploy, real-send, spend, publish) *always* parks in the
-  **fast-verify queue** for your one-click approval. The gates hold at every level.
-- **A live agent workspace.** A multi-pane grid of agent channels, an org chart,
-  a process-table overlay, and a launch ladder — populated from demo data out of
-  the box, ready to point at your own.
-- **Reliability + context panels.** A fail-closed health surface, a
-  context-pressure policy (treats the LLM window as RAM and tracks "survival
-  pins"), a metric-gated KEEP/REVERT retention loop, and a proof-of-work token
-  tracker that prices usage at your provider's rates.
-- **Voice (optional).** Local speech-to-text and neural text-to-speech skeletons
-  (faster-whisper + Piper). The shell runs fine without them.
-- **A display seal.** A small, configurable mechanism that maps internal labels
-  to clean product words and hides any term you don't want rendered — so the UI
-  always shows a professional face.
-- **Runs out of the box.** The repo ships with `demo-data/` so every panel
-  renders on first launch, with no backend wired.
+- **Bring your own model (BYOM).** Point SERVARI at any OpenAI-compatible chat endpoint — OpenAI, OpenRouter, Together, Ollama, LM Studio, vLLM, or similar. Your provider config lives in gitignored `config.json`.
+- **Gate-controlled autonomy.** A per-agent dial from **L0** to **L5**. Higher levels widen what an agent may do on safe work, but high-risk work parks in the fast-verify queue at every level.
+- **Live workspace surface.** Agent channels, org chart, process-table overlay, launch ladder, and panels render from demo data out of the box.
+- **Reliability panels.** Fail-closed health surface, context-pressure policy, token tracker, and metric-gated retention loop.
+- **Optional voice skeleton.** Local STT/TTS integration points are present; the shell runs fine without voice packages.
+- **Display seal.** Configurable UI label mapping and denylist for product-facing chrome.
+- **No provider key required for demo mode.** The shell renders and verifies without a model provider.
 
 ---
 
@@ -65,191 +98,166 @@ You need **Node.js 18+** and **Python 3.9+**.
 
 ```bash
 # 1. clone
-git clone <your-fork-url> servari-open
+git clone https://github.com/Haris88m/servari-open.git
 cd servari-open
 
-# 2. build the UI (one time, and after any UI change)
+# 2. verify the public control-plane claims
+python scripts/verify_all.py
+
+# 3. build the UI
 cd ui
 npm install
 npm run build
 cd ..
 
-# 3. (optional) wire your model — copy the template and fill it in
-#    Without this, the chat records your messages but won't generate replies.
+# 4. optional: wire your model
 cp config.example.json config.json
-#    edit config.json: set base_url + model (+ api_key if your provider is hosted)
+# edit config.json: set base_url + model (+ api_key if your provider is hosted)
 
-# 4. run the server
+# 5. run the server
 python server/servari_server.py
-#    -> open http://127.0.0.1:8911/
+# -> open http://127.0.0.1:8911/
 ```
 
-That's it. The dashboard, agent grid, org chart, gates, and every panel render
-from the bundled demo data immediately.
+The dashboard, agent grid, org chart, gates, and panels render from bundled demo data immediately.
 
 ### Run as a desktop app (optional)
 
 ```bash
-npm install            # at the repo root (installs Electron)
-npm start              # opens the SERVARI window (starts the server for you)
+npm install
+npm start
 # or build a portable Windows .exe:
-npm run build:exe      # -> dist-exe/SERVARI-x64.exe   (Windows; needs Python on PATH)
+npm run build:exe
 ```
 
-On Windows you can also just double-click `START-SERVARI.cmd`.
+On Windows you can also double-click `START-SERVARI.cmd`.
 
 ---
 
 ## Two ways to run it
 
-SERVARI has two front doors. Use whichever fits your workflow.
-
 ### 1. The app
 
-The desktop / web shell — the full UI with the agent grid, gates, and panels.
+The desktop/web shell: full UI with agent grid, gates, and panels.
 
 ```bash
-# desktop window (Windows)
-servari.cmd app                 # or double-click START-SERVARI.cmd
-# or the built portable .exe (npm run build:exe)
-# or just the web shell:
 python server/servari_server.py # -> http://127.0.0.1:8911/
 ```
 
-### 2. The CLI — a full interactive SERVARI session in your terminal
+### 2. The CLI
 
-This is SERVARI as a **persistent, interactive agent session in the terminal** —
-the way a power user runs an agent OS. You bring the harness; SERVARI is the boot
-persona that the session loads from [`SERVARI.md`](./SERVARI.md). Pick the backend
-that matches your workflow:
-
-| Backend | The session you get | Requirement |
-|---|---|---|
-| `claude` | a live interactive Claude Code CLI session, booted as SERVARI | `claude` on PATH; sign in once with `claude` |
-| `codex` | a live interactive OpenAI Codex CLI session, booted as SERVARI | `codex` on PATH; sign in once with `codex` |
-| `api` | SERVARI's own interactive terminal chat over your BYOM endpoint | `config.json` with `base_url` + `model` |
+SERVARI can also run as a persistent interactive session in the terminal. The terminal persona is public in [`SERVARI.md`](./SERVARI.md).
 
 ```bash
-# start an interactive SERVARI session (auto-detects the best available backend)
 servari.cmd cli
-
-# force a specific backend
-servari.cmd cli --backend claude   # interactive Claude Code CLI session as SERVARI
-servari.cmd cli --backend codex    # interactive OpenAI Codex CLI session as SERVARI
-servari.cmd cli --backend api      # interactive BYOM chat as SERVARI (config.json)
-
-# one-shot (no session, prints one reply) — uses the API backend
-servari.cmd cli -p "what is SERVARI?"
-
-# see the exact session launch command, without starting it
-servari.cmd cli --print-cmd
-
-# see what's available on this machine
+servari.cmd cli --backend claude
+servari.cmd cli --backend codex
+servari.cmd cli --backend api
 servari.cmd cli --detect
 ```
 
-**How it boots as SERVARI.** When you start the session, SERVARI hands control to
-your harness *in the repo directory* with an opening instruction to read
-`SERVARI.md` and operate as SERVARI for the whole session — the harness picks up
-`SERVARI.md` (and `AGENTS.md`) from the working dir, and from there it is a normal
-interactive session in that tool. Exit the session to return. For the `api`
-backend there is no third-party TUI, so SERVARI's own terminal chat loop **is** the
-session, and it loads `SERVARI.md` as its system line when present.
-
-The CLI auto-detects: if the Claude CLI is installed it uses that, otherwise it
-falls back to the direct BYOM API. A missing backend is reported plainly with how
-to install it, and the other backends are offered. The API backend calls SERVARI's
-chat directly — it does **not** start the HTTP server, so there is no port conflict.
-
-Without `servari.cmd` (or on non-Windows), call the program directly:
+Without `servari.cmd`, call the program directly:
 
 ```bash
-python server/servari_cli.py                 # interactive SERVARI session (auto)
+python server/servari_cli.py
 python server/servari_cli.py --detect
-python server/servari_cli.py --print-cmd     # show the session launch command
 python server/servari_cli.py --backend api -p "what is SERVARI?"
 ```
-
-Add the repo root to your `PATH` to drop the `.cmd` and the `cli` token is the only
-extra word you type.
 
 ---
 
 ## Wiring your own model
 
-SERVARI speaks the OpenAI-compatible `/chat/completions` shape, which nearly every
-provider exposes. Copy `config.example.json` to `config.json` and set:
+SERVARI speaks the OpenAI-compatible `/chat/completions` shape. Copy `config.example.json` to `config.json` and set:
 
 | field | what it is | examples |
 |---|---|---|
-| `base_url` | the provider's API base | OpenAI `https://api.openai.com/v1` · Ollama `http://127.0.0.1:11434/v1` · OpenRouter `https://openrouter.ai/api/v1` · LM Studio `http://127.0.0.1:1234/v1` |
-| `model` | the model id at that provider | `gpt-4o-mini` · `llama3.1:8b` · `meta-llama/llama-3.1-8b-instruct` |
-| `api_key` | your key (empty for keyless local servers) | `sk-...` |
-| `provider` | a free-text label for your own reference | `openai` · `ollama` · `openrouter` |
+| `base_url` | provider API base | OpenAI, OpenRouter, Ollama, LM Studio, vLLM, Together |
+| `model` | model id at that provider | `gpt-4o-mini`, `llama3.1:8b`, provider-specific ids |
+| `api_key` | provider credential if required | empty for keyless local servers |
+| `provider` | your own label | `openai`, `ollama`, `openrouter` |
 
-`config.json` is gitignored. Check `GET /api/byom-status` (or send a message in the
-chat) to confirm the model is wired.
+`config.json` is gitignored. Check `GET /api/byom-status` or run:
+
+```bash
+python server/chat_byom.py --check
+```
 
 ---
 
-## Architecture (at a glance)
+## Architecture at a glance
 
-```
+```text
  ┌──────────────────────────────────────────────┐
  │  React shell (ui/)            served by ↓     │   the FACE
  │  chat · agent grid · org · gates · panels     │
  └───────────────┬──────────────────────────────┘
-                 │  same-origin /api/*  (no CORS)
+                 │  same-origin /api/*
  ┌───────────────▼──────────────────────────────┐
  │  Python server (server/servari_server.py)     │   the SPINE
- │  stdlib HTTP · serves the SPA · JSON API      │
- │  ├─ autonomy.py      the L0–L5 dial           │
- │  ├─ verify_queue.py  the fast-verify gates    │
+ │  stdlib HTTP · serves SPA · JSON API          │
+ │  ├─ autonomy.py      L0-L5 dial               │
+ │  ├─ verify_queue.py  fast-verify gates        │
  │  ├─ health.py        fail-closed health       │
  │  ├─ retention.py     KEEP/REVERT metric loop  │
  │  ├─ context_policy.py context-pressure policy │
- │  ├─ tokens.py        proof-of-work tracker    │
- │  ├─ chat_byom.py     YOUR model (BYOM)         │
- │  └─ providers/*      personal-world panels    │
+ │  ├─ tokens.py        token tracker            │
+ │  ├─ chat_byom.py     model bridge             │
+ │  └─ providers/*      panel data readers       │
  └───────────────┬──────────────────────────────┘
                  │  reads / writes
  ┌───────────────▼──────────────────────────────┐
- │  demo-data/   seed data so it renders day one  │   the DATA
+ │  demo-data/   synthetic seed data             │
  └───────────────────────────────────────────────┘
 ```
 
-The server is **pure stdlib** (no pip install needed to run), every route
-**degrades gracefully** (a missing module returns a clean "unavailable" payload
-instead of crashing), and the action runner is **allow-listed** (not a raw shell).
-See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full picture and
-[`docs/SETUP.md`](./docs/SETUP.md) for setup details.
+The server is Python standard library only. Routes are designed to degrade cleanly when backing data or modules are unavailable. The action runner is allow-listed.
+
+See:
+
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+- [`docs/SETUP.md`](./docs/SETUP.md)
+- [`docs/REPRODUCIBILITY.md`](./docs/REPRODUCIBILITY.md)
+- [`docs/CLAIM_REGISTER.md`](./docs/CLAIM_REGISTER.md)
+- [`docs/SECURITY_MODEL.md`](./docs/SECURITY_MODEL.md)
+- [`docs/THREAT_MODEL.md`](./docs/THREAT_MODEL.md)
+- [`docs/LICENSE_MATRIX.md`](./docs/LICENSE_MATRIX.md)
+
+---
+
+## Relationship to the audit
+
+This repository is the runnable **source repo**, licensed under **Apache-2.0**.
+
+The audit/publication repository is separate:
+
+- `Haris88m/agentic-os-audit`
+- license: **CC-BY-4.0** for written audit documents
+- purpose: public evidence narrative, methodology, metrics, limits, and comparison
+
+The audit should cite this repository for runtime verification. This repository should cite the audit for the broader evidence narrative. Runtime behavior is verified here through source inspection, `scripts/verify_all.py`, and CI.
 
 ---
 
 ## Demo data
 
-Everything under `demo-data/` is synthetic seed data so the shell is alive on
-first run. Re-stamp the time-based seeds (so the panes look "just active") with:
+Everything under `demo-data/` is synthetic seed data so the shell is alive on first run. Re-stamp the time-based seeds with:
 
 ```bash
 python demo-data/_seed.py
 ```
 
-To wire your own data, edit the files in `demo-data/` or point `SERVARI_HOME` at
-your own directory with the same shapes.
+To wire your own data, edit the files in `demo-data/` or point `SERVARI_HOME` at your own directory with the same shapes.
 
 ---
 
 ## Contributing & security
 
-- **Contributing:** see [CONTRIBUTING.md](./CONTRIBUTING.md) — how to file issues,
-  propose changes, and the one rule that matters (keep it runnable for a stranger).
-- **Security:** found a vulnerability? Please **do not** open a public issue — see
-  [SECURITY.md](./SECURITY.md) for private disclosure.
+- **Contributing:** see [CONTRIBUTING.md](./CONTRIBUTING.md).
+- **Security:** found a vulnerability? Please do not open a public issue with details. See [SECURITY.md](./SECURITY.md).
 
 ---
 
 ## License
 
-[Apache License 2.0](./LICENSE) © The SERVARI OS Project. See [NOTICE](./NOTICE) for
-third-party attributions.
+Source code is licensed under [Apache License 2.0](./LICENSE) © The SERVARI OS Project. See [NOTICE](./NOTICE) and [docs/LICENSE_MATRIX.md](./docs/LICENSE_MATRIX.md) for third-party attribution and license boundaries.
