@@ -36,12 +36,14 @@ Usage:
   python servari_cli.py --backend claude      interactive Claude CLI session as SERVARI
   python servari_cli.py --backend codex       interactive Codex CLI session as SERVARI
   python servari_cli.py --backend api         interactive BYOM chat as SERVARI
+  python servari_cli.py --backend codex --workspace C:\\path\\to\\workspace
   python servari_cli.py --backend api -p "..." one-shot: send, print, exit
   python servari_cli.py --print-cmd           show the session launch command, don't run
   python servari_cli.py --app                 launch the desktop / web app instead
 
 Flags:
   --backend {claude,codex,api}   force a backend (else auto-detected)
+  --workspace PATH               launch the selected harness from this workspace
   -p, --print TEXT               one-shot prompt (no interactive loop)
   --detect                       print the detection table and exit
   --print-cmd                    print the exact session launch argv and exit (no launch)
@@ -115,6 +117,32 @@ def _load_config() -> dict:
         return {}
 
 
+def _workspace_home(override: str | None = None) -> Path:
+    """Resolve the harness workspace.
+
+    Public-safe and path-free by default:
+      1. --workspace PATH
+      2. SERVARI_WORKSPACE_HOME env var
+      3. config.json workspace_home / harness_home
+      4. SERVARI repo root
+
+    This lets a local operator point SERVARI at a private "fortress" workspace
+    without hardcoding or publishing that path in the open-source repo.
+    """
+    raw = (override or "").strip()
+    if not raw:
+        raw = os.environ.get("SERVARI_WORKSPACE_HOME", "").strip()
+    if not raw:
+        cfg = _load_config()
+        raw = str(cfg.get("workspace_home") or cfg.get("harness_home") or "").strip()
+    if raw:
+        p = Path(raw).expanduser()
+        if p.is_dir():
+            return p.resolve()
+        print(f"  SERVARI: workspace path is not a directory: {p}", file=sys.stderr)
+    return _home()
+
+
 # --------------------------------------------------------------------------- #
 # The SERVARI boot persona.
 # --------------------------------------------------------------------------- #
@@ -142,26 +170,26 @@ SESSION_BOOT_PROMPT_NO_FILE = (
 )
 
 
-def _persona_path() -> Path:
-    """Absolute path to the SERVARI.md persona file at the repo root."""
-    return _home() / SERVARI_PERSONA_FILE
+def _persona_path(home: Path | None = None) -> Path:
+    """Absolute path to the SERVARI.md persona file in the selected home."""
+    return (home or _home()) / SERVARI_PERSONA_FILE
 
 
-def _persona_exists() -> bool:
-    """True when SERVARI.md is present at the repo root."""
+def _persona_exists(home: Path | None = None) -> bool:
+    """True when SERVARI.md is present in the selected home."""
     try:
-        return _persona_path().is_file()
+        return _persona_path(home).is_file()
     except OSError:
         return False
 
 
-def _read_persona() -> str | None:
+def _read_persona(home: Path | None = None) -> str | None:
     """Read SERVARI.md text if present (for the API session's system line).
 
     Returns the file text, or None when the file is absent/unreadable so the
     caller can fall back to the built-in SYSTEM_LINE.
     """
-    p = _persona_path()
+    p = _persona_path(home)
     try:
         if not p.is_file():
             return None
@@ -171,7 +199,22 @@ def _read_persona() -> str | None:
         return None
 
 
-def build_session_cmd(backend: str, binary: str) -> list[str]:
+def _project_boot_prompt(home: Path) -> tuple[str, str]:
+    """Return (prompt, source) for the selected workspace."""
+    if _persona_exists(home):
+        return SESSION_BOOT_PROMPT, SERVARI_PERSONA_FILE
+    agents = home / "AGENTS.md"
+    if agents.is_file():
+        return (
+            "Read AGENTS.md in this workspace and follow its project operating "
+            "instructions for this entire session. Treat SERVARI as the launcher "
+            "and control plane; the selected workspace is the source of truth. "
+            "Greet me briefly, then wait for my first instruction."
+        ), "AGENTS.md"
+    return SESSION_BOOT_PROMPT_NO_FILE, "built-in boot prompt"
+
+
+def build_session_cmd(backend: str, binary: str, home: Path | None = None) -> list[str]:
     """Build the exact argv that launches an interactive harness session as SERVARI.
 
     backend == "claude":  claude "<boot prompt>"   (claude reads SERVARI.md/AGENTS.md
@@ -184,7 +227,7 @@ def build_session_cmd(backend: str, binary: str) -> list[str]:
     When SERVARI.md is absent, a self-contained fallback prompt carries the
     identity so the session still boots as SERVARI.
     """
-    prompt = SESSION_BOOT_PROMPT if _persona_exists() else SESSION_BOOT_PROMPT_NO_FILE
+    prompt, _src = _project_boot_prompt(home or _home())
     return [binary, prompt]
 
 
@@ -292,7 +335,7 @@ def print_detection(d: dict) -> None:
 # --------------------------------------------------------------------------- #
 # Run-loops.
 # --------------------------------------------------------------------------- #
-def run_loop_api(one_shot: str | None = None) -> int:
+def run_loop_api(one_shot: str | None = None, home: Path | None = None) -> int:
     """SERVARI's own REPL over the BYOM API (chat_byom.reply).
 
     Does NOT start the HTTP server - calls the chat backend directly as a
@@ -314,7 +357,7 @@ def run_loop_api(one_shot: str | None = None) -> int:
     # The API session IS the interactive SERVARI session for the BYOM path (no
     # third-party TUI exists). Load SERVARI.md as the system line when present;
     # else chat_byom falls back to its built-in SYSTEM_LINE.
-    persona = _read_persona()
+    persona = _read_persona(home)
 
     if one_shot is not None:
         r = _chat.reply([{"from": "user", "text": one_shot}], system=persona)
@@ -355,7 +398,12 @@ def run_loop_api(one_shot: str | None = None) -> int:
     return 0
 
 
-def run_loop_cli(backend: str, binary: str, one_shot: str | None = None) -> int:
+def run_loop_cli(
+    backend: str,
+    binary: str,
+    one_shot: str | None = None,
+    home: Path | None = None,
+) -> int:
     """Run a child CLI harness (claude / codex) as SERVARI.
 
     Interactive SESSION (default): hand control to the harness with an opening
@@ -366,7 +414,7 @@ def run_loop_cli(backend: str, binary: str, one_shot: str | None = None) -> int:
     One-shot (-p): map to the harness's non-interactive flag
         (claude -p "..." / codex exec "...").
     """
-    home = _home()
+    home = home or _home()
     try:
         if one_shot is not None:
             if backend == "claude":
@@ -379,10 +427,14 @@ def run_loop_cli(backend: str, binary: str, one_shot: str | None = None) -> int:
             proc = subprocess.run(cmd, cwd=str(home))
             return proc.returncode
         # Interactive session: boot the harness as SERVARI.
-        cmd = build_session_cmd(backend, binary)
-        if _persona_exists():
+        cmd = build_session_cmd(backend, binary, home=home)
+        _prompt, boot_src = _project_boot_prompt(home)
+        if boot_src == SERVARI_PERSONA_FILE:
             print(f"  SERVARI: opening an interactive {backend} session as SERVARI "
                   f"(booting from {SERVARI_PERSONA_FILE}). Exit the session to return.")
+        elif boot_src == "AGENTS.md":
+            print(f"  SERVARI: opening an interactive {backend} session from AGENTS.md "
+                  f"in {home}. Exit the session to return.")
         else:
             print(f"  SERVARI: opening an interactive {backend} session as SERVARI "
                   f"({SERVARI_PERSONA_FILE} not found - using the built-in boot). "
@@ -511,7 +563,7 @@ def interactive_pick(d: dict) -> str | None:
 # --------------------------------------------------------------------------- #
 # Dry-run: show the session launch command without starting a TUI.
 # --------------------------------------------------------------------------- #
-def _print_session_cmd(d: dict, backend: str | None) -> int:
+def _print_session_cmd(d: dict, backend: str | None, home: Path | None = None) -> int:
     """Print the exact interactive-session launch command for `backend`.
 
     Constructs and prints the argv WITHOUT launching anything (safe for tests /
@@ -521,9 +573,9 @@ def _print_session_cmd(d: dict, backend: str | None) -> int:
         print("  SERVARI: no usable backend - nothing to launch.", file=sys.stderr)
         print_detection(d)
         return 1
-    home = _home()
+    home = home or _home()
     if backend == "api":
-        persona = _read_persona()
+        persona = _read_persona(home)
         src = SERVARI_PERSONA_FILE if persona else "built-in SYSTEM_LINE"
         print(f"  session backend : api (SERVARI's own terminal chat loop)")
         print(f"  cwd             : {home}")
@@ -537,8 +589,8 @@ def _print_session_cmd(d: dict, backend: str | None) -> int:
         if backend in INSTALL_HINTS:
             print(f"  {INSTALL_HINTS[backend]}", file=sys.stderr)
         return 1
-    cmd = build_session_cmd(backend, binary)
-    boot_src = SERVARI_PERSONA_FILE if _persona_exists() else "built-in boot prompt"
+    cmd = build_session_cmd(backend, binary, home=home)
+    _prompt, boot_src = _project_boot_prompt(home)
     print(f"  session backend : {backend}")
     print(f"  cwd             : {home}")
     print(f"  boots from      : {boot_src}")
@@ -559,6 +611,10 @@ def main(argv=None) -> int:
     )
     ap.add_argument("--backend", choices=BACKENDS,
                     help="Force a backend (else auto-detected).")
+    ap.add_argument("--workspace", metavar="PATH",
+                    help="Launch the selected harness from this workspace. "
+                         "Also configurable via SERVARI_WORKSPACE_HOME or "
+                         "config.json workspace_home.")
     ap.add_argument("-p", "--print", dest="one_shot", metavar="TEXT",
                     help="One-shot: send TEXT, print the reply, exit (no loop).")
     ap.add_argument("--detect", action="store_true",
@@ -573,6 +629,7 @@ def main(argv=None) -> int:
         return run_app()
 
     d = detect()
+    session_home = _workspace_home(args.workspace)
 
     if args.detect:
         print_detection(d)
@@ -583,7 +640,7 @@ def main(argv=None) -> int:
     # --print-cmd: show what the interactive session WOULD launch, without
     # starting a TUI. Useful for scripting and for understanding the boot.
     if args.print_cmd:
-        return _print_session_cmd(d, backend)
+        return _print_session_cmd(d, backend, home=session_home)
 
     # No usable backend yet (and none was forced) - offer an interactive pick
     # when we have a terminal, otherwise show the detection table honestly.
@@ -604,7 +661,7 @@ def main(argv=None) -> int:
         return 1
 
     if backend == "api":
-        return run_loop_api(one_shot=args.one_shot)
+        return run_loop_api(one_shot=args.one_shot, home=session_home)
     # claude / codex - shell out to the child binary.
     binary = d[backend]["path"]
     if not binary:
@@ -612,7 +669,7 @@ def main(argv=None) -> int:
         if backend in INSTALL_HINTS:
             print(f"  {INSTALL_HINTS[backend]}", file=sys.stderr)
         return 1
-    return run_loop_cli(backend, binary, one_shot=args.one_shot)
+    return run_loop_cli(backend, binary, one_shot=args.one_shot, home=session_home)
 
 
 if __name__ == "__main__":

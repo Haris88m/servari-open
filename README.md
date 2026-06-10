@@ -154,6 +154,7 @@ servari.cmd cli --backend claude
 servari.cmd cli --backend codex
 servari.cmd cli --backend api
 servari.cmd cli --detect
+servari.cmd cli --backend codex --workspace C:\path\to\your\workspace
 ```
 
 Without `servari.cmd`, call the program directly:
@@ -162,7 +163,15 @@ Without `servari.cmd`, call the program directly:
 python server/servari_cli.py
 python server/servari_cli.py --detect
 python server/servari_cli.py --backend api -p "what is SERVARI?"
+python server/servari_cli.py --backend codex --workspace C:\path\to\your\workspace --print-cmd
 ```
+
+Use `--workspace`, `SERVARI_WORKSPACE_HOME`, or `config.json` `workspace_home`
+when you want the selected harness to boot from another project home. If that
+workspace contains `AGENTS.md`, SERVARI launches the harness there and asks it to
+follow that file as the source of truth. This is how the same shell can start a
+Claude session, a Codex/GPT session, or direct BYOM chat without hardcoding a
+private path into the public repo.
 
 ---
 
