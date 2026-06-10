@@ -492,7 +492,7 @@ export function ChatStage() {
 
   // stop listening if the component unmounts — BUT NOT when GlobalVoice owns the
   // conversation. Tearing down on unmount is exactly the bug we are fixing: the
-  // architect navigates away and the conversation must SURVIVE. When GlobalVoice
+  // operator navigates away and the conversation must SURVIVE. When GlobalVoice
   // is present it owns the loop across navigation, so ChatStage leaves it alone.
   useEffect(() => {
     return () => {
@@ -593,7 +593,7 @@ export function ChatStage() {
 
         {/* Voice status line — every voice state + error is VISIBLE.
             Errors render in red; listening shows a tiny live amplitude bar so the
-            architect can SEE the mic is heard. Silent-mic + transcribing/speaking
+            operator can SEE the mic is heard. Silent-mic + transcribing/speaking
             states are surfaced too. Suppressed when GlobalVoice owns the surface. */}
         {(isListening || voiceError || echoFiltered) && !globalVoice && (
           <div
