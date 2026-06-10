@@ -57,3 +57,7 @@ jobs:
       - name: Build UI
         working-directory: ui
         run: npm run build
+
+      - name: Audit production UI dependencies
+        working-directory: ui
+        run: npm audit --omit=dev

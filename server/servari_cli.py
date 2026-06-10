@@ -361,7 +361,7 @@ def run_loop_cli(backend: str, binary: str, one_shot: str | None = None) -> int:
     Interactive SESSION (default): hand control to the harness with an opening
         instruction to read SERVARI.md and operate as SERVARI, in the repo dir
         so it picks up SERVARI.md / AGENTS.md. stdin/stdout/stderr are inherited
-        so the user gets the real interactive TUI - the "like the architect runs
+        so the user gets the real interactive TUI - the "like the operator runs
         it" path.
     One-shot (-p): map to the harness's non-interactive flag
         (claude -p "..." / codex exec "...").
