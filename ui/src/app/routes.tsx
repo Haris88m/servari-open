@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import { Shell } from "./components/Shell";
 import { BootSequence } from "./components/BootSequence";
 import { ChatStage } from "./components/ChatStage";
@@ -15,6 +15,7 @@ import { ContextPressure } from "./components/ContextPressure";
 import { Health } from "./components/Health";
 import { TokensPanel } from "./components/TokensPanel";
 import { PersonalView } from "./components/PersonalView";
+import { EngineRuntimeView } from "./components/EngineRuntimeView";
 
 // AgentsView is lazy-loaded so this route file compiles even if the module
 // lands slightly later in the build.
@@ -63,6 +64,8 @@ export const router = createBrowserRouter([
       { path: "context-pressure", element: <ContextPressure /> },
       { path: "health", element: <Health /> },
       { path: "tokens", element: <TokensPanel /> },
+      { path: "runtime", element: <EngineRuntimeView /> },
+      { path: "engine", element: <Navigate to="/shell/runtime" replace /> },
       { path: "personal", element: <PersonalView /> },
     ],
   },

@@ -65,15 +65,18 @@ def _home() -> Path:
     return Path.cwd()
 
 
-CONFIG = _home() / "config.json"
+def _config_path() -> Path:
+    """Path to config.json under the active SERVARI root."""
+    return _home() / "config.json"
 
 
 def load_config() -> dict:
     """Read config.json. Missing/unreadable/malformed -> {}. Never raises."""
     try:
-        if not CONFIG.is_file():
+        config_path = _config_path()
+        if not config_path.is_file():
             return {}
-        data = json.loads(CONFIG.read_text(encoding="utf-8", errors="replace"))
+        data = json.loads(config_path.read_text(encoding="utf-8", errors="replace"))
         return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, ValueError, OSError):
         return {}
@@ -85,7 +88,7 @@ def is_configured() -> dict:
     model = (cfg.get("model") or "").strip()
     base = (cfg.get("base_url") or "").strip()
     key = (cfg.get("api_key") or "").strip()
-    if not CONFIG.is_file():
+    if not _config_path().is_file():
         return {"ok": False, "model": "", "base_url": "", "has_key": False,
                 "reason": "config.json not found — copy config.example.json to config.json and fill it in."}
     if not base or not model:

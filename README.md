@@ -11,6 +11,8 @@ SERVARI is the *shell and control plane*: a React desktop/web UI over a small Py
 
 > Accurate public claim: SERVARI is an open-source, local-first BYOM agentic OS shell with mechanical autonomy gates, an append-only human verification queue, file-backed state, fail-closed health surfaces, and a metric-gated retention loop.
 
+Current public release documentation: [Release notes](./docs/releases/2026-06-10-servari-runtime-controls.md).
+
 ---
 
 ## What this repo covers
@@ -77,6 +79,7 @@ See [`./docs/screenshots/`](./docs/screenshots/) for the full set.
 | Autonomy dials | ![autonomy](./docs/screenshots/04-autonomy.png) |
 | Fast-verify gates | ![gates](./docs/screenshots/05-gates.png) |
 | Agent workspace | ![agents](./docs/screenshots/06-agents.png) |
+| Runtime console | ![runtime](./docs/screenshots/07-runtime.png) |
 
 ---
 
@@ -89,6 +92,29 @@ See [`./docs/screenshots/`](./docs/screenshots/) for the full set.
 - **Optional voice skeleton.** Local STT/TTS integration points are present; the shell runs fine without voice packages.
 - **Display seal.** Configurable UI label mapping and denylist for product-facing chrome.
 - **No provider key required for demo mode.** The shell renders and verifies without a model provider.
+
+## Local Runtime Control API (Servari Runtime)
+
+SERVARI ships a bundled runtime-control surface at `/shell/runtime` and exposes five same-origin endpoints:
+
+- `GET /api/engine/status`
+- `GET /api/engine/logs`
+- `POST /api/engine/start`
+- `POST /api/engine/stop`
+- `POST /api/engine/restart`
+
+The `EngineRuntimeView` panel uses these endpoints to manage a local subprocess (start/stop/restart), read status, and stream recent logs. These routes are served by the same Python shell process that serves the UI on the same host.
+
+### Runtime behavior for the downloaded exe
+
+When a user installs/runs the Windows executable in this repo:
+
+1. The embedded shell server binds to localhost by default (`127.0.0.1:8911`) and serves `ui/dist/`.
+2. The Electron window points only at that local URL.
+3. Runtime control routes start/stop a process on the same machine the Servari shell is running on.
+4. Nothing in the current architecture makes the downloaded exe connect automatically to `mine` / another machine.
+
+If a user has not manually configured different hosts, all traffic remains local-first by default.
 
 ---
 
@@ -172,6 +198,12 @@ workspace contains `AGENTS.md`, SERVARI launches the harness there and asks it t
 follow that file as the source of truth. This is how the same shell can start a
 Claude session, a Codex/GPT session, or direct BYOM chat without hardcoding a
 private path into the public repo.
+
+For APEX PRIME run modes, point to your private workspace once:
+
+```bash
+servari.cmd cli --backend codex --workspace "C:\\path\\to\\your\\servari-workspace"
+```
 
 ---
 

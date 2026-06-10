@@ -29,12 +29,14 @@ Labels:
 | C15 | Concurrent multi-agent execution engine is shipped in this repo. | UNVERIFIED / NOT SHIPPED | None | Not applicable | Roadmap/separate auditable component if added later | "Not shipped in this repo" | "Full swarm engine is public and verified" |
 | C16 | SERVARI is a model. | UNVERIFIED / NOT SHIPPED | None | Not applicable | SERVARI is a shell over a user-chosen model | "BYOM shell" | "New foundation model" |
 | C17 | SERVARI is AGI or beats frontier systems. | UNVERIFIED / NOT CLAIMED | None | Not applicable | Outside project scope | "Agentic OS shell" | "AGI", "beats frontier", "fully sovereign" |
+| C18 | SERVARI can start/stop/restart a local managed runtime subprocess from the dashboard and API. | VERIFIED | `server/servari_server.py` route handlers and `ui/src/app/components/EngineRuntimeView.tsx` controls | `python scripts/verify_all.py`; manual runtime control smoke + `/api/engine/*` requests from the dashboard | Works for local process lifecycle control with fallback-aware launcher behavior; does not claim production remote orchestration. | "LOCAL runtime control surface for start/stop/restart" | "Cloud scheduler", "remote fleet control" |
+| C19 | Runtime control is local by default (no automatic remote pairing/targeting). | VERIFIED | `server/servari_server.py` host/port defaults + docs statements | `python scripts/verify_all.py`, `py server/servari_server.py`, README and setup docs | Requires explicit host rewrite to control a remote host. With defaults, `127.0.0.1:8911` serves all primary surfaces. | "Runtime management stays local by default" | "Downloaded exe connects to your PC without intent" |
 
 ## Current public claim
 
 The strongest accurate public claim is:
 
-> SERVARI is an open-source, local-first BYOM agentic OS shell with mechanical autonomy gates, an append-only human verification queue, file-backed state, fail-closed health surfaces, and a metric-gated retention loop.
+> SERVARI is an open-source, local-first BYOM agentic OS shell with mechanical autonomy gates, a local runtime control surface, an append-only human verification queue, file-backed state, fail-closed health surfaces, and a metric-gated retention loop.
 
 ## Current public non-claim
 

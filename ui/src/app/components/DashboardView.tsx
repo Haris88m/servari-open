@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+﻿import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -9,6 +9,7 @@ import {
   AlertCircle,
   CheckSquare,
   Activity,
+  Cpu,
 } from "lucide-react";
 import {
   API,
@@ -21,6 +22,7 @@ import {
   type LaunchResponse,
   type StateResponse,
   type RunResponse,
+  type EngineState,
   paneTurnCount,
 } from "../lib/api";
 import { sealLabel } from "../lib/display_seal";
@@ -39,9 +41,9 @@ function money(n: number): string {
 }
 
 function fmtRelative(ts: number | string | null | undefined): string {
-  if (!ts) return "—";
+  if (!ts) return "â€”";
   const ms = typeof ts === "string" ? Date.parse(ts) : (ts as number) * 1000;
-  if (!isFinite(ms)) return "—";
+  if (!isFinite(ms)) return "â€”";
   const diff = Math.floor((Date.now() - ms) / 1000);
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
@@ -50,9 +52,9 @@ function fmtRelative(ts: number | string | null | undefined): string {
 }
 
 function fmtTime(ts: number | string | null | undefined): string {
-  if (!ts) return "—";
+  if (!ts) return "â€”";
   const ms = typeof ts === "string" ? Date.parse(ts) : (ts as number) * 1000;
-  if (!isFinite(ms)) return "—";
+  if (!isFinite(ms)) return "â€”";
   return new Date(ms).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
@@ -77,7 +79,7 @@ function readPressure(p: number | string | undefined): string {
 
 function splitNum(stage: string): string {
   const m = (stage || "").match(/^\s*([0-9]+)\s+/);
-  return m ? m[1] : "—";
+  return m ? m[1] : "â€”";
 }
 
 function splitName(stage: string): string {
@@ -87,7 +89,7 @@ function splitName(stage: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Panel base — ivory title (NOT teal)
+// Panel base â€” ivory title (NOT teal)
 // ---------------------------------------------------------------------------
 
 function Panel({
@@ -295,7 +297,7 @@ function ActivityPanel({
   index: number;
 }) {
   return (
-    <Panel title="Activity" meta="live · last 8" index={index}>
+    <Panel title="Activity" meta="live Â· last 8" index={index}>
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2" style={{ minHeight: 80 }}>
           <Activity size={20} style={{ color: "var(--s-text-secondary)" }} />
@@ -371,7 +373,7 @@ function ActivityPanel({
 }
 
 // ---------------------------------------------------------------------------
-// QuickActionsPanel — fires the demo /api/run actions exposed by the server.
+// QuickActionsPanel â€” fires the demo /api/run actions exposed by the server.
 // Titles are display copy; the `action` ids must match the server's allow-list.
 // ---------------------------------------------------------------------------
 
@@ -383,6 +385,135 @@ const QUICK_ACTIONS = [
 ] as const;
 
 type ActionResult = RunResponse | "loading" | "error" | null;
+
+function EnginePanel({
+  status,
+  error,
+  index,
+  onOpenPanel,
+}: {
+  status: EngineState | null;
+  error: string;
+  index: number;
+  onOpenPanel: () => void;
+}) {
+  const running = Boolean(status?.running);
+  const pid = status?.pid ?? null;
+  const cfg = status?.config || {};
+  const host = String(cfg.host || "127.0.0.1");
+  const port = typeof cfg.port === "number" ? cfg.port : Number.parseInt(String(cfg.port || "7000"), 10) || 7000;
+  const launched = status?.started_at
+    ? new Date(status.started_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+    : "";
+  const badgeColor = running ? "var(--s-status-ok)" : "var(--s-text-secondary)";
+  const probeReady =
+    typeof status?.probe_ready === "object" && status?.probe_ready !== null
+      ? (status.probe_ready as Record<string, unknown>)
+      : null;
+  const readyLabel = probeReady && typeof probeReady.ok === "boolean" ? (probeReady.ok ? "READY" : "NOT READY") : running ? "STARTING" : "OFF";
+  const indicatorGlow = running ? "var(--s-glow-green)" : "none";
+
+  const openService = () => {
+    if (!running) return;
+    window.open(`http://${host}:${port}`, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <Panel title="SERVARI Runtime" meta="managed runtime" index={index}>
+      <div className="space-y-3">
+        <div
+          className="rounded-lg px-3 py-2 flex items-center justify-between"
+          style={{ border: "1px solid var(--s-edge-subtle)", background: "var(--s-glass)" }}
+        >
+          <span
+            className="inline-flex items-center gap-2"
+            style={{ color: badgeColor, fontSize: "var(--t-12)", fontFamily: "var(--font-mono)" }}
+          >
+            <span
+              className="inline-block rounded-full"
+              style={{
+                width: 8,
+                height: 8,
+                background: running ? "var(--s-status-ok)" : "var(--s-text-secondary)",
+                boxShadow: indicatorGlow,
+              }}
+            />
+            <Cpu size={14} />
+            {running ? `RUNNING ${host}:${port}` : "STOPPED"}
+          </span>
+          <span style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-10)", fontFamily: "var(--font-mono)" }}>
+            {status ? `pid ${pid ?? "n/a"}` : "not managed"}
+          </span>
+        </div>
+
+        <div
+          className="rounded-lg px-3 py-2"
+          style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(250, 248, 243, 0.03)" }}
+        >
+          <div
+            className="grid"
+            style={{
+              gap: 4,
+              fontSize: "var(--t-11)",
+              color: "var(--s-text-secondary)",
+              gridTemplateColumns: "1fr 1fr",
+            }}
+          >
+            <span>Ready probe</span>
+            <span style={{ color: "var(--s-text-primary)", textAlign: "right" }}>{running ? readyLabel : "off"}</span>
+            <span>Started</span>
+            <span style={{ color: "var(--s-text-primary)", textAlign: "right" }}>{launched || "--"}</span>
+            <span>Home</span>
+            <span
+              style={{
+                color: "var(--s-text-primary)",
+                textAlign: "right",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {cfg.home || "--"}
+            </span>
+            <span>Status note</span>
+            <span style={{ color: "var(--s-text-primary)", textAlign: "right" }}>{error || (status ? "ok" : "unavailable")}</span>
+          </div>
+        </div>
+
+        {error && <div style={{ color: "var(--s-status-error)", fontSize: "var(--t-11)" }}>{error}</div>}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onOpenPanel}
+            className="rounded-lg px-3 py-1.5 text-xs"
+            style={{
+              border: "1px solid var(--s-edge-subtle)",
+              color: "var(--s-text-primary)",
+              background: "rgba(250, 248, 243, 0.04)",
+              boxShadow: running ? "0 0 16px rgba(20, 156, 150, 0.2)" : "none",
+            }}
+          >
+            Open control
+          </button>
+          <button
+            type="button"
+            onClick={openService}
+            disabled={!running}
+            className="rounded-lg px-3 py-1.5 text-xs"
+            style={{
+              border: `1px solid ${running ? "var(--s-status-ok)" : "var(--s-edge-subtle)"}`,
+              color: running ? "var(--s-status-ok)" : "var(--s-text-secondary)",
+              background: running ? "rgba(63,185,80,0.12)" : "rgba(250, 248, 243, 0.02)",
+            }}
+          >
+            Open service
+          </button>
+        </div>
+      </div>
+    </Panel>
+  );
+}
 
 function QuickActionsPanel({ index }: { index: number }) {
   const [results, setResults] = useState<Record<string, ActionResult>>({});
@@ -524,7 +655,7 @@ function QuickActionsPanel({ index }: { index: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// DashboardView — 3-zone OS layout
+// DashboardView â€” 3-zone OS layout
 // ---------------------------------------------------------------------------
 
 export function DashboardView() {
@@ -538,6 +669,8 @@ export function DashboardView() {
   const [context, setContext] = useState<ContextResponse | null>(null);
   const [launch, setLaunch] = useState<LaunchResponse | null>(null);
   const [state, setState] = useState<StateResponse | null>(null);
+  const [engine, setEngine] = useState<EngineState | null>(null);
+  const [engineError, setEngineError] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -550,7 +683,7 @@ export function DashboardView() {
       }
     };
     const load = async () => {
-      const [t, g, h, v, r, c, l, s] = await Promise.all([
+      const [t, g, h, v, r, c, l, s, engineResp] = await Promise.all([
         safe(API.tokens()),
         safe(API.grid()),
         safe(API.health()),
@@ -559,6 +692,7 @@ export function DashboardView() {
         safe(API.context()),
         safe(API.launch()),
         safe(API.state()),
+        safe(API.engineStatus()),
       ]);
       if (!alive) return;
       if (t) setTokens(t);
@@ -569,6 +703,16 @@ export function DashboardView() {
       if (c) setContext(c);
       if (l) setLaunch(l);
       if (s) setState(s);
+      if (engineResp && engineResp.ok && engineResp.status) {
+        setEngine(engineResp.status);
+        setEngineError("");
+      } else if (engineResp && engineResp.error) {
+        setEngine(null);
+        setEngineError(engineResp.error);
+      } else if (!engineResp) {
+        setEngine(null);
+        setEngineError("engine status endpoint unavailable");
+      }
     };
     load();
     const id = setInterval(load, 5000);
@@ -578,7 +722,7 @@ export function DashboardView() {
     };
   }, []);
 
-  // ── Derived values ────────────────────────────────────────────────────────
+  // â”€â”€ Derived values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const liveTotal = tokens?.live?.total_tokens ?? 0;
   const liveCost = tokens?.live?.cost_usd ?? 0;
@@ -606,7 +750,7 @@ export function DashboardView() {
   const retentionPending = retention?.pending ?? [];
   // The "GATES" counter has ONE source of truth: verify_queue.list_pending()
   // (exposed at /api/verify-queue and reconciled identically in server/health.py).
-  // Retention runs are a SEPARATE queue with their own RETAIN concept — folding
+  // Retention runs are a SEPARATE queue with their own RETAIN concept â€” folding
   // them in here is what made the status bar (2) disagree with /api/verify-queue (1).
   // The stale nervous-system.json open_gates list is no longer counted as a gate.
   const gatesPending = verifyPending.length;
@@ -626,12 +770,12 @@ export function DashboardView() {
 
   const stages = launch?.stages ?? [];
   const current = stages.find((s) => s.cls !== "done") ?? stages[stages.length - 1];
-  const launchNum = current ? splitNum(current.stage) : "—";
+  const launchNum = current ? splitNum(current.stage) : "â€”";
   const launchName = current ? splitName(current.stage) : "no arc";
 
   const channels = state?.channels ?? {};
 
-  // ── Priority items ────────────────────────────────────────────────────────
+  // â”€â”€ Priority items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const priorityItems: Array<{ id: string; label: string; tag: string }> = [];
   verifyPending.slice(0, 3).forEach((item) => {
@@ -654,23 +798,23 @@ export function DashboardView() {
   });
   // GATE priority items come ONLY from the verify-queue (the single source of truth
   // above). The legacy nervous-system.json open_gates list is intentionally NOT
-  // surfaced here — it disagreed with the live queue and double-counted gates.
-  // All real sources empty — single honest state (no fake MAINT/COST items).
+  // surfaced here â€” it disagreed with the live queue and double-counted gates.
+  // All real sources empty â€” single honest state (no fake MAINT/COST items).
   if (priorityItems.length === 0) {
-    priorityItems.push({ id: "sys-clear", label: "No priority items — all queues clear", tag: "INFO" });
+    priorityItems.push({ id: "sys-clear", label: "No priority items â€” all queues clear", tag: "INFO" });
   }
 
-  // ── Activity items ────────────────────────────────────────────────────────
+  // â”€â”€ Activity items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const activityItems: Array<{ channel: string; text: string; ts: number | string | null }> = [];
   for (const pane of panes) {
     if (pane.last_ts) {
       const sealed = sealLabel(pane.name) || pane.name;
-      // pane.turns is an ARRAY of turn objects, not a count — use paneTurnCount.
+      // pane.turns is an ARRAY of turn objects, not a count â€” use paneTurnCount.
       const turnCount = paneTurnCount(pane);
       activityItems.push({
         channel: sealed,
-        text: `${turnCount} turn${turnCount !== 1 ? "s" : ""} · ${money(Number(pane.owes) || 0)}`,
+        text: `${turnCount} turn${turnCount !== 1 ? "s" : ""} Â· ${money(Number(pane.owes) || 0)}`,
         ts: pane.last_ts,
       });
     }
@@ -682,7 +826,7 @@ export function DashboardView() {
   });
   const recent = activityItems.slice(0, 8);
 
-  // ── Toggle ────────────────────────────────────────────────────────────────
+  // â”€â”€ Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const toggleChecked = useCallback((id: string) => {
     setChecked((prev) => {
@@ -693,7 +837,7 @@ export function DashboardView() {
     });
   }, []);
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   return (
     <motion.div
@@ -708,7 +852,7 @@ export function DashboardView() {
       <div className="flex flex-1 min-h-0 gap-6 p-8 pb-4">
         {/* WORKSPACE 2/3 */}
         <div className="flex-[2] min-w-0 flex flex-col gap-4">
-          <SectionHeader label="Workspace" meta={`${activeAgents} active · ${panes.length} total`} />
+          <SectionHeader label="Workspace" meta={`${activeAgents} active Â· ${panes.length} total`} />
           <div className="flex-1 min-h-0">
             <WorkspaceGrid panes={panes} />
           </div>
@@ -718,7 +862,8 @@ export function DashboardView() {
         <div className="flex flex-col gap-4 overflow-auto" style={{ width: 320, flexShrink: 0 }}>
           <PrioritiesPanel items={priorityItems} checked={checked} onToggle={toggleChecked} index={0} />
           <ActivityPanel items={recent} index={1} />
-          <QuickActionsPanel index={2} />
+          <EnginePanel status={engine} error={engineError} index={2} onOpenPanel={() => navigate("/shell/runtime")} />
+          <QuickActionsPanel index={3} />
         </div>
       </div>
 
@@ -745,3 +890,4 @@ export function DashboardView() {
 }
 
 export default DashboardView;
+

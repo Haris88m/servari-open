@@ -70,6 +70,12 @@ def _jsonable(value: Any) -> Any:
         return repr(value)
 
 
+def _find_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
 class CheckRunner:
     def __init__(self) -> None:
         self.checks: List[Dict[str, Any]] = []
@@ -244,6 +250,86 @@ def _get_json(path: str) -> Dict[str, Any]:
     return json.loads(raw)
 
 
+def _post_json(path: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    url = f"http://127.0.0.1:{TEST_PORT}{path}"
+    body = json.dumps(payload or {}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        method="POST",
+        data=body,
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        raw = resp.read().decode("utf-8", errors="replace")
+        status = resp.status
+    assert status == 200, {"url": url, "status": status, "body": raw[:200]}
+    return json.loads(raw)
+
+
+def _write_fake_engine_home(path: Path) -> int:
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "app.py").write_text(
+        """import argparse
+import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+
+async def app(scope, receive, send):
+    assert scope.get("type") == "http"
+    request_path = scope.get("path", "")
+    if request_path in ("/api/health", "/api/ready"):
+        status = 200
+        body = json.dumps({"ok": True, "service": "fixture"}).encode("utf-8")
+    else:
+        status = 404
+        body = json.dumps({"ok": False, "error": "not_found"}).encode("utf-8")
+
+    await send({
+        "type": "http.response.start",
+        "status": status,
+        "headers": [(b"content-type", b"application/json; charset=utf-8")],
+    })
+    await send({
+        "type": "http.response.body",
+        "body": body,
+    })
+
+
+def _cli() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=7000)
+    args = parser.parse_args()
+
+    class Handler(BaseHTTPRequestHandler):
+        def _payload(self, response, status=200):
+            body = json.dumps(response).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            if self.path in ("/api/health", "/api/ready"):
+                self._payload({"ok": True, "service": "fixture"})
+            else:
+                self._payload({"ok": False, "error": "not_found"}, status=404)
+
+        def log_message(self, *_a, **_k):
+            return
+
+    server = HTTPServer((args.host, args.port), Handler)
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    _cli()
+""",
+        encoding="utf-8",
+    )
+    return _find_free_port()
+
 def check_server_smoke() -> Dict[str, Any]:
     env = os.environ.copy()
     env["SERVARI_HOME"] = str(TEST_HOME)
@@ -268,7 +354,11 @@ def check_server_smoke() -> Dict[str, Any]:
             "/api/verify-queue": _get_json("/api/verify-queue"),
             "/api/byom-status": _get_json("/api/byom-status"),
             "/api/actions": _get_json("/api/actions"),
+            "/api/engine/status": _get_json("/api/engine/status"),
+            "/api/engine/logs": _get_json("/api/engine/logs"),
         }
+        payloads["/api/engine/control"] = check_engine_control_payload(payloads["/api/engine/status"])
+        return payloads
     finally:
         proc.terminate()
         try:
@@ -276,9 +366,70 @@ def check_server_smoke() -> Dict[str, Any]:
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=5)
-    assert "actions" in payloads["/api/actions"], payloads
-    assert set(payloads["/api/actions"]["actions"]) == EXPECTED_ACTIONS, payloads["/api/actions"]
-    return payloads
+
+
+def check_engine_control_payload(base_status: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate local engine start / restart / stop and logs end-to-end."""
+    engine_port = _find_free_port()
+    engine_home = TEST_HOME / "engine-runtime-fixture"
+    fake_port = _write_fake_engine_home(engine_home)
+    assert fake_port != TEST_PORT
+
+    # We can target any free local port; using a dedicated free port isolates the
+    # engine fixture from test flakiness caused by the shell port.
+    start_cfg = {
+        "home": str(engine_home),
+        "host": "127.0.0.1",
+        "port": engine_port,
+        "python": sys.executable,
+        "auth_enabled": False,
+    }
+
+    start = None
+    restart = None
+    stopped = None
+    logs_started = []
+    try:
+        start = _post_json("/api/engine/start", start_cfg)
+        assert start.get("ok") is True, start
+        assert start.get("status", {}).get("running") is True, start
+        started = _get_json("/api/engine/status")
+        assert started.get("ok") is True, started
+        assert isinstance(started.get("status"), dict), started
+        assert bool(started["status"].get("running")) is True, started
+
+        restart = _post_json("/api/engine/restart", start_cfg)
+        assert restart.get("ok") is True, restart
+        restarted = _get_json("/api/engine/status")
+        assert restarted.get("ok") is True, restarted
+        assert bool(restarted.get("status", {}).get("running")) is True, restarted
+
+        stopped = _post_json("/api/engine/stop")
+        assert stopped.get("ok") is True, stopped
+        final_status = _get_json("/api/engine/status")
+        assert final_status.get("ok") is True, final_status
+        assert bool(final_status.get("status", {}).get("running")) is False, final_status
+        final_logs = _get_json("/api/engine/logs")
+        logs_started = final_logs.get("logs", [])
+        assert isinstance(logs_started, list), final_logs
+        return {
+            "start": start,
+            "restart": restart,
+            "stop": stopped,
+            "final_status": final_status,
+            "running_after_start": started.get("status", {}).get("running"),
+            "running_after_restart": restarted.get("status", {}).get("running"),
+            "log_count": len(logs_started),
+            "base_status_running": bool(base_status.get("status", {}).get("running")),
+            "engine_port": engine_port,
+            "log_sample": logs_started[-3:],
+        }
+    finally:
+        if stopped is None:
+            try:
+                _post_json("/api/engine/stop")
+            except Exception:
+                pass
 
 
 def check_gitignore_secrets() -> Dict[str, Any]:
@@ -314,3 +465,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

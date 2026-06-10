@@ -14,6 +14,7 @@ import {
   Coins,
   Briefcase,
   Building2,
+  Cpu,
   Pin,
   PinOff,
 } from "lucide-react";
@@ -62,6 +63,7 @@ const DOCK_GROUPS: DockGroup[] = [
       { id: "fast-verify", icon: ShieldCheck, label: "Gates", path: "/shell/fast-verify" },
       { id: "autonomy-dials", icon: Gauge, label: "Autonomy", path: "/shell/autonomy-dials" },
       { id: "health", icon: Heart, label: "Health", path: "/shell/health" },
+      { id: "engine", icon: Cpu, label: "Runtime", path: "/shell/runtime" },
       { id: "tokens", icon: Coins, label: "Tokens", path: "/shell/tokens" },
       { id: "launch-arc", icon: Rocket, label: "Launch Arc", path: "/shell/launch-arc" },
     ],

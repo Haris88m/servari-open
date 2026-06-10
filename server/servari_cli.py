@@ -52,6 +52,7 @@ Flags:
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import json
 import os
 import shutil
@@ -141,6 +142,33 @@ def _workspace_home(override: str | None = None) -> Path:
             return p.resolve()
         print(f"  SERVARI: workspace path is not a directory: {p}", file=sys.stderr)
     return _home()
+
+
+@contextmanager
+def _servari_home(home: Path | None):
+    """Temporarily set SERVARI_HOME for this process while preserving prior value."""
+    previous = os.environ.get("SERVARI_HOME")
+    if home is None:
+        if previous is not None:
+            os.environ.pop("SERVARI_HOME", None)
+    else:
+        os.environ["SERVARI_HOME"] = str(home)
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("SERVARI_HOME", None)
+        else:
+            os.environ["SERVARI_HOME"] = previous
+
+
+def _api_config_home(home: Path | None) -> Path | None:
+    """Prefer workspace config.json for API calls; fallback to repo default."""
+    if home is None:
+        return None
+    if (home / "config.json").is_file():
+        return home
+    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -234,7 +262,7 @@ def build_session_cmd(backend: str, binary: str, home: Path | None = None) -> li
 # --------------------------------------------------------------------------- #
 # Backend detection.
 # --------------------------------------------------------------------------- #
-def detect() -> dict:
+def detect(home: Path | None = None) -> dict:
     """Report what each backend can do right now.
 
     Returns a dict:
@@ -257,7 +285,8 @@ def detect() -> dict:
     # API availability: ask the BYOM backend if it's wired.
     if _chat is not None:
         try:
-            st = _chat.is_configured()
+            with _servari_home(_api_config_home(home)):
+                st = _chat.is_configured()
         except Exception:  # noqa: BLE001
             st = {"ok": False, "model": "", "base_url": "", "reason": "chat backend error"}
     else:
@@ -347,7 +376,8 @@ def run_loop_api(one_shot: str | None = None, home: Path | None = None) -> int:
               file=sys.stderr)
         return 1
 
-    st = _chat.is_configured()
+    with _servari_home(_api_config_home(home)):
+        st = _chat.is_configured()
     if not st.get("ok"):
         print(f"  SERVARI: no model is wired. {st.get('reason', '')}", file=sys.stderr)
         print("  Copy config.example.json to config.json and set base_url + model "
@@ -360,7 +390,8 @@ def run_loop_api(one_shot: str | None = None, home: Path | None = None) -> int:
     persona = _read_persona(home)
 
     if one_shot is not None:
-        r = _chat.reply([{"from": "user", "text": one_shot}], system=persona)
+        with _servari_home(_api_config_home(home)):
+            r = _chat.reply([{"from": "user", "text": one_shot}], system=persona)
         if r.get("ok"):
             print(r.get("text", ""))
             return 0
@@ -386,7 +417,8 @@ def run_loop_api(one_shot: str | None = None, home: Path | None = None) -> int:
         if text.lower() in ("/exit", "/quit", "exit", "quit"):
             break
         history.append({"from": "user", "text": text})
-        r = _chat.reply(history, system=persona)
+        with _servari_home(_api_config_home(home)):
+            r = _chat.reply(history, system=persona)
         if r.get("ok"):
             reply_text = r.get("text", "")
             print(f"SERVARI > {reply_text}")
@@ -628,8 +660,8 @@ def main(argv=None) -> int:
     if args.app:
         return run_app()
 
-    d = detect()
     session_home = _workspace_home(args.workspace)
+    d = detect(home=session_home)
 
     if args.detect:
         print_detection(d)

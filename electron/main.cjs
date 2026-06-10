@@ -3,7 +3,7 @@
 // from the project at runtime (not bundled). Home-resolution is robust for the
 // packaged portable exe, whose __dirname points at a temp extraction dir — it
 // finds the real project via env var, then the dev-relative path.
-const { app, BrowserWindow, session } = require("electron");
+const { app, BrowserWindow, session, shell } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
@@ -99,9 +99,23 @@ function createWindow() {
     show: false, // show maximized once ready (no white flash, OS-feel)
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
+  // Better startup feel: transparent shell surface, then show only when ready.
+  win.setMenuBarVisibility(false);
+  win.once("ready-to-show", () => {
+    win.show();
+  });
   win.maximize();
-  win.show();
   win.loadURL(URL);
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith(`http://${HOST}:${PORT}`)) {
+      return { action: "allow" };
+    }
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      shell.openExternal(url);
+      return { action: "deny" };
+    }
+    return { action: "deny" };
+  });
   win.webContents.on("did-fail-load", () => {
     setTimeout(() => win.loadURL(URL), 1000);
   });

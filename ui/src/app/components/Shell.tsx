@@ -50,6 +50,7 @@ export function Shell() {
     if (path.includes("org-chart")) return "ORG CHART";
     if (path.includes("standing-orders")) return "STANDING ORDERS";
     if (path.includes("launch-arc")) return "LAUNCH ARC";
+    if (path.includes("engine") || path.includes("runtime")) return "RUNTIME";
     if (path.includes("autonomy-dials")) return "AUTONOMY DIALS";
     if (path.includes("fast-verify")) return "FAST-VERIFY GATES";
     if (path.includes("retention")) return "RETENTION";

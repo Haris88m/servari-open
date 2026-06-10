@@ -354,6 +354,46 @@ export interface RunResponse {
   [k: string]: unknown;
 }
 
+export interface EngineConfig {
+  home?: string;
+  host?: string;
+  port?: number | string;
+  python?: string;
+  auth_enabled?: boolean;
+}
+
+export interface EngineState {
+  running: boolean;
+  managed: boolean;
+  pid: number | null;
+  started_at: string | null;
+  returncode: number | null;
+  config: EngineConfig;
+  probe_health?: unknown;
+  probe_ready?: unknown;
+}
+
+export interface EngineActionResponse {
+  ok: boolean;
+  message?: string;
+  error?: string;
+  status?: EngineState;
+  config?: EngineConfig;
+}
+
+export interface EngineStatusResponse {
+  ok: boolean;
+  status?: EngineState;
+  error?: string;
+}
+
+export interface EngineLogsResponse {
+  ok: boolean;
+  logs: string[];
+  count: number;
+  error?: string;
+}
+
 export interface TtsVoiceInfo {
   name: string;
   culture?: string;
@@ -531,6 +571,22 @@ export const API = {
   },
   run(action: string): Promise<RunResponse> {
     return getJSON<RunResponse>(`/api/run${qs({ action })}`);
+  },
+  // --- engine lifecycle ---
+  engineStatus(): Promise<EngineStatusResponse> {
+    return getJSON<EngineStatusResponse>('/api/engine/status');
+  },
+  engineLogs(lines?: number): Promise<EngineLogsResponse> {
+    return getJSON<EngineLogsResponse>(`/api/engine/logs${qs({ lines })}`);
+  },
+  engineStart(config: EngineConfig = {}): Promise<EngineActionResponse> {
+    return postJSON<EngineActionResponse>('/api/engine/start', config);
+  },
+  engineStop(): Promise<EngineActionResponse> {
+    return postJSON<EngineActionResponse>('/api/engine/stop');
+  },
+  engineRestart(config: EngineConfig = {}): Promise<EngineActionResponse> {
+    return postJSON<EngineActionResponse>('/api/engine/restart', config);
   },
 
   // --- voice ---

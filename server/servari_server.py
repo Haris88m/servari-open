@@ -20,6 +20,11 @@ localhost only. Safe DOM in the SPA (no innerHTML). Stdlib. cp1252-safe.
 """
 from __future__ import annotations
 import json, os, sys, glob, subprocess, datetime, platform, shutil
+from typing import Optional
+import threading, time
+from collections import deque
+from urllib.request import urlopen
+from urllib.error import HTTPError, URLError
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -68,6 +73,381 @@ def _port() -> int:
 
 HOST = os.environ.get("SERVARI_HOST", "").strip() or "127.0.0.1"
 PORT = _port()
+
+
+# --- SERVARI local engine lifecycle (managed subprocess) ---------------------
+_ENGINE_LOCK = threading.Lock()
+_ENGINE_PROC: Optional[subprocess.Popen] = None
+_ENGINE_STARTED_AT: Optional[str] = None
+_ENGINE_CONFIG: Optional[dict[str, object]] = None
+_ENGINE_LOG_BUFFER = deque(maxlen=500)
+
+
+def _engine_default_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on", "enable", "enabled"}
+
+
+def _engine_parse_port(raw: str, default: int) -> int:
+    if not raw:
+        return default
+    try:
+        p = int(raw.strip())
+        if 1 <= p <= 65535:
+            return p
+    except Exception:
+        pass
+    return default
+
+
+def _engine_default_home() -> str:
+    """Resolve initial local-engine home.
+
+    Resolve from SERVARI_ENGINE_HOME when present, otherwise scan likely local
+    workspace locations and then return ROOT as a final fallback.
+    """
+    candidates: list[Path] = []
+    raw = (os.environ.get("SERVARI_ENGINE_HOME", "") or "").strip()
+    if raw:
+        candidates.append(Path(raw))
+    candidates.extend(
+        [
+            ROOT / "workspace",
+            ROOT / "engine",
+            ROOT / "servari-engine",
+            Path.cwd() / "workspace",
+            Path.cwd() / "engine",
+            Path.cwd() / "servari-engine",
+        ]
+    )
+
+    for c in candidates:
+        p = c.expanduser()
+        if not p.is_absolute():
+            p = p.resolve()
+        if (p / "app.py").is_file():
+            return str(p)
+    return str(ROOT)
+
+
+def _engine_default_config() -> dict[str, object]:
+    return {
+        "home": _engine_default_home(),
+        "host": (os.environ.get("SERVARI_ENGINE_HOST", "") or "127.0.0.1").strip(),
+        "port": _engine_parse_port((os.environ.get("SERVARI_ENGINE_PORT", "") or "").strip(), 7000),
+        "python": (os.environ.get("SERVARI_ENGINE_PYTHON", "") or sys.executable),
+        "auth_enabled": _engine_default_bool("SERVARI_ENGINE_AUTH_ENABLED", False),
+    }
+
+
+def _engine_append_log(line: str) -> None:
+    if not line:
+        return
+    line = str(line).rstrip("\r\n")
+    if not line:
+        return
+    with _ENGINE_LOCK:
+        _ENGINE_LOG_BUFFER.append(f"{datetime.datetime.now().isoformat(timespec='seconds')} | {line}")
+
+
+def _engine_tail_logs(lines: Optional[int]) -> list[str]:
+    with _ENGINE_LOCK:
+        if not _ENGINE_LOG_BUFFER:
+            return []
+        if lines is None or lines <= 0 or lines >= len(_ENGINE_LOG_BUFFER):
+            return list(_ENGINE_LOG_BUFFER)
+        return list(_ENGINE_LOG_BUFFER)[-lines:]
+
+
+def _engine_log_reader(p: subprocess.Popen) -> None:
+    stream = p.stdout
+    if stream is None:
+        return
+    try:
+        for raw in iter(stream.readline, ""):
+            _engine_append_log(raw)
+    except Exception:
+        pass
+    finally:
+        _engine_append_log("[engine stdout reader ended]")
+
+
+def _engine_resolve_home(raw: str) -> Path:
+    p = Path(raw).expanduser()
+    if not p.is_absolute():
+        p = Path.cwd() / p
+    return p.resolve()
+
+
+def _engine_status_probe(base_url: str, path: str) -> dict[str, object]:
+    url = base_url.rstrip("/") + path
+    start = time.perf_counter()
+    try:
+        with urlopen(url, timeout=1.5) as r:
+            raw = r.read(64 * 1024)
+            try:
+                body = json.loads(raw.decode("utf-8", errors="replace"))
+            except Exception:
+                body = raw.decode("utf-8", errors="replace")
+            return {
+                "ok": True,
+                "status_code": r.status,
+                "url": url,
+                "response_ms": round((time.perf_counter() - start) * 1000, 1),
+                "body": body,
+            }
+    except HTTPError as e:
+        try:
+            detail = e.read().decode("utf-8", errors="replace")[:300]
+        except Exception:
+            detail = ""
+        return {
+            "ok": False,
+            "error": f"http {e.code}",
+            "status_code": e.code,
+            "url": url,
+            "response_ms": round((time.perf_counter() - start) * 1000, 1),
+            "detail": detail,
+        }
+    except URLError as e:
+        return {
+            "ok": False,
+            "error": f"urlopen:{type(e).__name__}",
+            "url": url,
+            "response_ms": round((time.perf_counter() - start) * 1000, 1),
+            "detail": str(e),
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": f"probe_failed:{type(e).__name__}",
+            "url": url,
+            "response_ms": round((time.perf_counter() - start) * 1000, 1),
+            "detail": str(e),
+        }
+
+
+def _engine_base_url(cfg: dict[str, object]) -> str:
+    host = str(cfg.get("host", "127.0.0.1"))
+    try:
+        port = int(cfg.get("port", 7000))
+    except Exception:
+        port = 7000
+    return f"http://{host}:{port}"
+
+
+def _engine_live_state() -> dict[str, object]:
+    with _ENGINE_LOCK:
+        proc = _ENGINE_PROC
+        cfg = dict(_ENGINE_CONFIG or {})
+        started_at = _ENGINE_STARTED_AT
+    running = proc is not None and proc.poll() is None
+    return {
+        "running": bool(running),
+        "managed": proc is not None,
+        "pid": proc.pid if proc else None,
+        "started_at": started_at,
+        "config": cfg,
+        "returncode": None if running else (proc.poll() if proc else None),
+    }
+
+
+def _engine_start(body: Optional[dict[str, object]] = None) -> dict[str, object]:
+    global _ENGINE_PROC, _ENGINE_CONFIG, _ENGINE_STARTED_AT
+    cfg = _engine_default_config()
+    payload = dict(body or {})
+
+    if payload.get("home"):
+        cfg["home"] = str(_engine_resolve_home(str(payload.get("home"))))
+    else:
+        cfg["home"] = str(_engine_resolve_home(str(cfg["home"])))
+    if payload.get("host"):
+        cfg["host"] = str(payload.get("host", cfg["host"])).strip() or str(cfg["host"])
+    if payload.get("python"):
+        cfg["python"] = str(payload.get("python", cfg["python"])).strip() or str(cfg["python"])
+    if "auth_enabled" in payload:
+        cfg["auth_enabled"] = bool(payload.get("auth_enabled"))
+    if payload.get("port") is not None:
+        cfg["port"] = _engine_parse_port(str(payload.get("port", cfg["port"])), int(cfg["port"]))  # type: ignore[arg-type]
+
+    home = Path(str(cfg["home"]))
+    if not home.is_dir() or not (home / "app.py").is_file():
+        return {
+            "ok": False,
+            "error": "engine_home_invalid",
+            "message": f"No app.py found under {home}",
+            "config": cfg,
+            "status": _engine_live_state(),
+        }
+
+    py = str(cfg["python"]).strip() or sys.executable
+    if not Path(py).is_file():
+        return {
+            "ok": False,
+            "error": "engine_python_not_found",
+            "message": f"Configured Python executable not found: {py}",
+            "config": cfg,
+            "status": _engine_live_state(),
+        }
+
+    running_pid = None
+    with _ENGINE_LOCK:
+        if _ENGINE_PROC is not None and _ENGINE_PROC.poll() is None:
+            running_pid = _ENGINE_PROC.pid
+    if running_pid is not None:
+        return {
+            "ok": False,
+            "error": "already_running",
+            "message": f"Local engine already running (pid={running_pid})",
+            "config": cfg,
+            "status": _engine_live_state(),
+        }
+
+    env = os.environ.copy()
+    env["APP_BIND"] = str(cfg["host"])
+    env["APP_PORT"] = str(cfg["port"])
+    env["AUTH_ENABLED"] = "true" if bool(cfg["auth_enabled"]) else "false"
+
+    uvicorn_cmd = [py, "-m", "uvicorn", "app:app", "--host", str(cfg["host"]), "--port", str(cfg["port"])]
+    cli_cmd = [py, "app.py", "--host", str(cfg["host"]), "--port", str(cfg["port"])]
+
+    def _spawn(cmd: list[str], mode: str) -> Optional[subprocess.Popen]:
+        _engine_append_log(
+            f"launch attempt ({mode}): {' '.join(cmd)} in {home} (auth={env['AUTH_ENABLED']})"
+        )
+        return subprocess.Popen(
+            cmd,
+            cwd=str(home),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=env,
+            text=True,
+            bufsize=1,
+        )
+
+    proc: Optional[subprocess.Popen] = None
+    launch_mode = "uvicorn"
+    try:
+        proc = _spawn(uvicorn_cmd, launch_mode)
+    except Exception as e:
+        proc = None
+        _engine_append_log(f"uvicorn launch failed to spawn ({type(e).__name__}): {e}")
+
+    if proc is None or proc.poll() is not None:
+        if proc is not None and proc.poll() is not None:
+            _engine_append_log(f"uvicorn exited quickly with code {proc.returncode}")
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+            try:
+                with _ENGINE_LOCK:
+                    if _ENGINE_PROC is proc:
+                        _ENGINE_PROC = None
+            except Exception:
+                pass
+        launch_mode = "cli"
+        _engine_append_log("falling back to local app.py CLI")
+        try:
+            proc = _spawn(cli_cmd, launch_mode)
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": "spawn_failed",
+                "message": f"uvicorn unavailable and CLI fallback failed: {e}",
+                "config": cfg,
+                "status": _engine_live_state(),
+            }
+
+    if proc is None:
+        return {
+            "ok": False,
+            "error": "spawn_failed",
+            "message": "engine launch produced no process",
+            "config": cfg,
+            "status": _engine_live_state(),
+        }
+
+    threading.Thread(target=_engine_log_reader, args=(proc,), daemon=True).start()
+
+    time.sleep(0.15)
+    if proc.poll() is not None:
+        with _ENGINE_LOCK:
+            _ENGINE_PROC = None
+            _ENGINE_CONFIG = None
+            _ENGINE_STARTED_AT = None
+        return {
+            "ok": False,
+            "error": "process_exit",
+            "message": f"engine process exited immediately (mode={launch_mode}, code={proc.returncode})",
+            "config": cfg,
+            "status": _engine_live_state(),
+        }
+
+    with _ENGINE_LOCK:
+        _ENGINE_PROC = proc
+        _ENGINE_STARTED_AT = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        _ENGINE_CONFIG = cfg
+
+    time.sleep(0.1)
+    _engine_append_log(f"started: pid={proc.pid}")
+    status = _engine_live_state()
+    base = _engine_base_url(cfg)
+    status["probe_health"] = _engine_status_probe(base, "/api/health")
+    status["probe_ready"] = _engine_status_probe(base, "/api/ready")
+    return {"ok": True, "message": "Local engine launch initiated", "status": status, "config": cfg}
+
+
+def _engine_stop() -> dict[str, object]:
+    global _ENGINE_PROC, _ENGINE_CONFIG, _ENGINE_STARTED_AT
+    with _ENGINE_LOCK:
+        proc = _ENGINE_PROC
+
+    if proc is None:
+        return {"ok": False, "error": "not_running", "status": _engine_live_state()}
+
+    if proc.poll() is not None:
+        with _ENGINE_LOCK:
+            _ENGINE_PROC = None
+            _ENGINE_CONFIG = None
+            _ENGINE_STARTED_AT = None
+        return {"ok": False, "error": "not_running", "status": _engine_live_state()}
+
+    _engine_append_log(f"stopping pid={proc.pid}")
+    try:
+        proc.terminate()
+    except Exception as e:
+        return {"ok": False, "error": "terminate_failed", "message": str(e), "status": _engine_live_state()}
+
+    try:
+        proc.wait(timeout=5)
+    except Exception:
+        try:
+            proc.kill()
+            proc.wait(timeout=2)
+        except Exception:
+            return {
+                "ok": False,
+                "error": "kill_failed",
+                "status": _engine_live_state(),
+            }
+
+    with _ENGINE_LOCK:
+        rc = proc.returncode
+        _ENGINE_PROC = None
+        _ENGINE_CONFIG = None
+        _ENGINE_STARTED_AT = None
+    _engine_append_log(f"stopped pid={proc.pid} rc={rc}")
+    return {"ok": True, "message": f"stopped pid={proc.pid}", "status": _engine_live_state()}
+
+
+def _engine_restart(body: Optional[dict[str, object]] = None) -> dict[str, object]:
+    stop = _engine_stop()
+    if stop.get("ok") is False and stop.get("error") not in ("not_running",):
+        return stop
+    return _engine_start(body)
 
 # --- the four shell modules (autonomy dial / verify gate queue / health /
 # retention / context / tokens). Load them defensively: a module-load failure
@@ -527,6 +907,28 @@ class H(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(200, json.dumps({"error": f"context read failed: {type(e).__name__}",
                                             "pressure": {}, "survival": {}}))
+        elif u.path == "/api/engine/status":
+            # Local engine lifecycle status (managed process + probes when running).
+            try:
+                state = _engine_live_state()
+                cfg = state.get("config", {}) if isinstance(state.get("config"), dict) else {}
+                if state.get("running") and isinstance(cfg, dict):
+                    base = _engine_base_url(cfg)
+                    state["probe_health"] = _engine_status_probe(base, "/api/health")
+                    state["probe_ready"] = _engine_status_probe(base, "/api/ready")
+                self._send(200, json.dumps({"ok": True, "status": state}))
+            except Exception as e:
+                self._send(200, json.dumps({"ok": False, "error": f"engine-status failed: {type(e).__name__}"}))
+        elif u.path == "/api/engine/logs":
+            # Local engine log feed from managed stdout ring buffer.
+            try:
+                query = parse_qs(u.query)
+                raw_lines = query.get("lines", [None])[0]
+                lines = int(raw_lines) if raw_lines is not None else None
+                logs = _engine_tail_logs(lines)
+                self._send(200, json.dumps({"ok": True, "logs": logs, "count": len(logs)}))
+            except Exception as e:
+                self._send(200, json.dumps({"ok": False, "error": f"engine-logs failed: {type(e).__name__}", "logs": []}))
         elif u.path == "/api/voice-speak-config":
             # the NEURAL TTS surface: engine + default voice + on-disk availability
             # (voice_neural.list_voices()). Own try/except, unavailable-degradation. Never crash.
@@ -716,6 +1118,12 @@ class H(BaseHTTPRequestHandler):
             else:
                 ok = _append(p, "user", "[direct message] " + self._body().get("text", ""))
                 self._send(200, json.dumps({"ok": ok}))
+        elif u.path == "/api/engine/start":
+            self._send(200, json.dumps(_engine_start(self._body())))
+        elif u.path == "/api/engine/stop":
+            self._send(200, json.dumps(_engine_stop()))
+        elif u.path == "/api/engine/restart":
+            self._send(200, json.dumps(_engine_restart(self._body())))
         elif u.path == "/api/set-autonomy":
             # set an agent's autonomy level (autonomy.set_level) — own try/except, never crash.
             try:
