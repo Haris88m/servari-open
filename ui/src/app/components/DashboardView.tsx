@@ -41,9 +41,9 @@ function money(n: number): string {
 }
 
 function fmtRelative(ts: number | string | null | undefined): string {
-  if (!ts) return "â€”";
+  if (!ts) return "—";
   const ms = typeof ts === "string" ? Date.parse(ts) : (ts as number) * 1000;
-  if (!isFinite(ms)) return "â€”";
+  if (!isFinite(ms)) return "—";
   const diff = Math.floor((Date.now() - ms) / 1000);
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
@@ -52,9 +52,9 @@ function fmtRelative(ts: number | string | null | undefined): string {
 }
 
 function fmtTime(ts: number | string | null | undefined): string {
-  if (!ts) return "â€”";
+  if (!ts) return "—";
   const ms = typeof ts === "string" ? Date.parse(ts) : (ts as number) * 1000;
-  if (!isFinite(ms)) return "â€”";
+  if (!isFinite(ms)) return "—";
   return new Date(ms).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
@@ -79,7 +79,7 @@ function readPressure(p: number | string | undefined): string {
 
 function splitNum(stage: string): string {
   const m = (stage || "").match(/^\s*([0-9]+)\s+/);
-  return m ? m[1] : "â€”";
+  return m ? m[1] : "—";
 }
 
 function splitName(stage: string): string {
@@ -89,7 +89,7 @@ function splitName(stage: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Panel base â€” ivory title (NOT teal)
+// Panel base — ivory title (NOT teal)
 // ---------------------------------------------------------------------------
 
 function Panel({
@@ -297,7 +297,7 @@ function ActivityPanel({
   index: number;
 }) {
   return (
-    <Panel title="Activity" meta="live Â· last 8" index={index}>
+    <Panel title="Activity" meta="live · last 8" index={index}>
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2" style={{ minHeight: 80 }}>
           <Activity size={20} style={{ color: "var(--s-text-secondary)" }} />
@@ -373,7 +373,7 @@ function ActivityPanel({
 }
 
 // ---------------------------------------------------------------------------
-// QuickActionsPanel â€” fires the demo /api/run actions exposed by the server.
+// QuickActionsPanel — fires the demo /api/run actions exposed by the server.
 // Titles are display copy; the `action` ids must match the server's allow-list.
 // ---------------------------------------------------------------------------
 
@@ -655,7 +655,7 @@ function QuickActionsPanel({ index }: { index: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// DashboardView â€” 3-zone OS layout
+// DashboardView — 3-zone OS layout
 // ---------------------------------------------------------------------------
 
 export function DashboardView() {
@@ -722,7 +722,7 @@ export function DashboardView() {
     };
   }, []);
 
-  // â”€â”€ Derived values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Derived values ────────────────────────────────────────────────────────
 
   const liveTotal = tokens?.live?.total_tokens ?? 0;
   const liveCost = tokens?.live?.cost_usd ?? 0;
@@ -750,7 +750,7 @@ export function DashboardView() {
   const retentionPending = retention?.pending ?? [];
   // The "GATES" counter has ONE source of truth: verify_queue.list_pending()
   // (exposed at /api/verify-queue and reconciled identically in server/health.py).
-  // Retention runs are a SEPARATE queue with their own RETAIN concept â€” folding
+  // Retention runs are a SEPARATE queue with their own RETAIN concept — folding
   // them in here is what made the status bar (2) disagree with /api/verify-queue (1).
   // The stale nervous-system.json open_gates list is no longer counted as a gate.
   const gatesPending = verifyPending.length;
@@ -770,12 +770,12 @@ export function DashboardView() {
 
   const stages = launch?.stages ?? [];
   const current = stages.find((s) => s.cls !== "done") ?? stages[stages.length - 1];
-  const launchNum = current ? splitNum(current.stage) : "â€”";
+  const launchNum = current ? splitNum(current.stage) : "—";
   const launchName = current ? splitName(current.stage) : "no arc";
 
   const channels = state?.channels ?? {};
 
-  // â”€â”€ Priority items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Priority items ────────────────────────────────────────────────────────
 
   const priorityItems: Array<{ id: string; label: string; tag: string }> = [];
   verifyPending.slice(0, 3).forEach((item) => {
@@ -798,23 +798,23 @@ export function DashboardView() {
   });
   // GATE priority items come ONLY from the verify-queue (the single source of truth
   // above). The legacy nervous-system.json open_gates list is intentionally NOT
-  // surfaced here â€” it disagreed with the live queue and double-counted gates.
-  // All real sources empty â€” single honest state (no fake MAINT/COST items).
+  // surfaced here — it disagreed with the live queue and double-counted gates.
+  // All real sources empty — single honest state (no fake MAINT/COST items).
   if (priorityItems.length === 0) {
-    priorityItems.push({ id: "sys-clear", label: "No priority items â€” all queues clear", tag: "INFO" });
+    priorityItems.push({ id: "sys-clear", label: "No priority items — all queues clear", tag: "INFO" });
   }
 
-  // â”€â”€ Activity items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Activity items ────────────────────────────────────────────────────────
 
   const activityItems: Array<{ channel: string; text: string; ts: number | string | null }> = [];
   for (const pane of panes) {
     if (pane.last_ts) {
       const sealed = sealLabel(pane.name) || pane.name;
-      // pane.turns is an ARRAY of turn objects, not a count â€” use paneTurnCount.
+      // pane.turns is an ARRAY of turn objects, not a count — use paneTurnCount.
       const turnCount = paneTurnCount(pane);
       activityItems.push({
         channel: sealed,
-        text: `${turnCount} turn${turnCount !== 1 ? "s" : ""} Â· ${money(Number(pane.owes) || 0)}`,
+        text: `${turnCount} turn${turnCount !== 1 ? "s" : ""} · ${money(Number(pane.owes) || 0)}`,
         ts: pane.last_ts,
       });
     }
@@ -826,7 +826,7 @@ export function DashboardView() {
   });
   const recent = activityItems.slice(0, 8);
 
-  // â”€â”€ Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Toggle ────────────────────────────────────────────────────────────────
 
   const toggleChecked = useCallback((id: string) => {
     setChecked((prev) => {
@@ -837,7 +837,7 @@ export function DashboardView() {
     });
   }, []);
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <motion.div
@@ -852,7 +852,7 @@ export function DashboardView() {
       <div className="flex flex-1 min-h-0 gap-6 p-8 pb-4">
         {/* WORKSPACE 2/3 */}
         <div className="flex-[2] min-w-0 flex flex-col gap-4">
-          <SectionHeader label="Workspace" meta={`${activeAgents} active Â· ${panes.length} total`} />
+          <SectionHeader label="Workspace" meta={`${activeAgents} active · ${panes.length} total`} />
           <div className="flex-1 min-h-0">
             <WorkspaceGrid panes={panes} />
           </div>
