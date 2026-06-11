@@ -70,11 +70,11 @@ From the repo root, with any Python 3.10+ on your PATH:
 python tests/byom_smoke.py
 ```
 
-Or with the project's bundled portable interpreter (see the project README for
-its path on your machine):
+No project-specific interpreter is required — any Python 3.9+ interpreter with
+pytest installed can also run the full unit suite:
 
 ```
-<bundled-python> tests/byom_smoke.py
+python -m pytest tests/ -q
 ```
 
 Exit code `0` = all steps passed. Non-zero = at least one step failed (the

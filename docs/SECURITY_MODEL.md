@@ -17,6 +17,7 @@ Core controls:
 7. **Fail-graceful routes** — missing modules or missing data should return clean unavailable payloads instead of crashing the server.
 8. **Metric-gated retention** — enrolled files can be snapshotted, measured, and reverted byte-exactly if a gating metric degrades.
 9. **Synthetic demo data** — bundled data is seed/demo data.
+10. **Engine runtime routes are a trusted-operator surface** — `POST /api/engine/start` accepts a caller-supplied interpreter path (`python`) and working directory (`home`) and spawns a local process. Like the rest of the API it is unauthenticated on `127.0.0.1`, so treat it as trusted operator configuration (the same class as the retention metric registry); it is not hardened for hostile-localhost or browser-CSRF contexts.
 
 ## Operator responsibilities
 

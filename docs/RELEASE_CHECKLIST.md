@@ -21,12 +21,14 @@ Use this checklist before tagging or announcing a public SERVARI release.
 ## Verification
 
 - [ ] `python scripts/verify_all.py` passes locally.
+- [ ] `python -m pytest tests/ -q` passes locally (145 tests).
 - [ ] The UI builds locally:
   - [ ] `cd ui`
   - [ ] `npm install`
   - [ ] `npm run build`
 - [ ] GitHub Actions `python-verification` passes.
 - [ ] GitHub Actions `ui-build` passes.
+- [ ] GitHub Actions `python-tests` passes.
 - [ ] `verification/last-run.json` is generated locally but not committed.
 
 ## Secret and data checks

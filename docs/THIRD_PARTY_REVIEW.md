@@ -31,6 +31,7 @@ Recommendation:
 8. `server/servari_server.py` — local server and allow-listed actions.
 9. `.gitignore` — local config and secret exclusions.
 10. `docs/SECURITY_MODEL.md` and `docs/THREAT_MODEL.md`.
+11. `server/hwfit/` — the Model Cookbook (MIT-licensed port; see `NOTICE`) — and `tests/` — the pytest unit suite.
 
 ## What to run first
 
@@ -39,6 +40,14 @@ python scripts/verify_all.py
 ```
 
 Expected: all checks pass and `verification/last-run.json` is written.
+
+Then run the pytest unit suite (install once with `python -m pip install pytest`):
+
+```bash
+python -m pytest tests/ -q
+```
+
+Expected: 145 passed.
 
 Then build the UI:
 

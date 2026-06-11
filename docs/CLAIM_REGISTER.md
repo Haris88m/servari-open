@@ -4,7 +4,7 @@ This register is the public boundary for what the `servari-open` repository prov
 
 Labels:
 
-- **VERIFIED** — inspectable in this repository and/or exercised by `python scripts/verify_all.py` or CI.
+- **VERIFIED** — inspectable in this repository and/or exercised by `python scripts/verify_all.py`, the pytest suite (`python -m pytest tests/ -q`, 145 tests), or CI.
 - **PARTIAL** — present as a surface, skeleton, or documented pathway, but not fully proven by the public verification harness.
 - **UNVERIFIED / NOT SHIPPED** — not present as runnable behavior in this repository.
 
@@ -31,6 +31,7 @@ Labels:
 | C17 | SERVARI is AGI or beats frontier systems. | UNVERIFIED / NOT CLAIMED | None | Not applicable | Outside project scope | "Agentic OS shell" | "AGI", "beats frontier", "fully sovereign" |
 | C18 | SERVARI can start/stop/restart a local managed runtime subprocess from the dashboard and API. | VERIFIED | `server/servari_server.py` route handlers and `ui/src/app/components/EngineRuntimeView.tsx` controls | `python scripts/verify_all.py`; manual runtime control smoke + `/api/engine/*` requests from the dashboard | Works for local process lifecycle control with fallback-aware launcher behavior; does not claim production remote orchestration. | "LOCAL runtime control surface for start/stop/restart" | "Cloud scheduler", "remote fleet control" |
 | C19 | Runtime control is local by default (no automatic remote pairing/targeting). | VERIFIED | `server/servari_server.py` host/port defaults + docs statements | `python scripts/verify_all.py`, `py server/servari_server.py`, README and setup docs | Requires explicit host rewrite to control a remote host. With defaults, `127.0.0.1:8911` serves all primary surfaces. | "Runtime management stays local by default" | "Downloaded exe connects to your PC without intent" |
+| C20 | Model Cookbook provides hardware-aware local-model recommendations. | VERIFIED | `server/hwfit/`; `tests/test_cookbook.py` (25 tests); `/api/cookbook/scan` + `/api/cookbook/recommend` routes | `python -m pytest tests/test_cookbook.py -q`; `python -m pytest tests/ -q` | Recommendation math runs locally over the bundled catalog; it does not download models or call external services | "Hardware-aware local-model recommendations" | "Automatic model downloader/installer" |
 
 ## Current public claim
 

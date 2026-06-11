@@ -100,7 +100,7 @@ The current full set of stills lives in [`./docs/screenshots/`](./docs/screensho
 ## What you get
 
 - **Bring your own model (BYOM).** Point SERVARI at any OpenAI-compatible chat endpoint — OpenAI, OpenRouter, Together, Ollama, LM Studio, vLLM, or similar. Your provider config lives in gitignored `config.json`.
-- **Model Cookbook.** Hardware-aware local-model recommendations: the shell reads your machine profile (RAM, VRAM, CPU) and suggests open models that actually fit it, from a ~900-entry catalog. Ported from the MIT-licensed Odysseus project, with attribution in [NOTICE](./NOTICE).
+- **Model Cookbook.** Hardware-aware local-model recommendations: the shell reads your machine profile (RAM, VRAM, CPU) and suggests open models that actually fit it, from a ~900-entry catalog. Ported from the MIT-licensed Odysseus project, with attribution in [NOTICE](./NOTICE). Served via `/api/cookbook/scan` and `/api/cookbook/recommend` (server routes; no UI panel yet).
 - **Gate-controlled autonomy.** A per-agent dial from **L0** to **L5**. Higher levels widen what an agent may do on safe work, but high-risk work parks in the fast-verify queue at every level.
 - **Live workspace surface.** Agent channels, org chart, process-table overlay, launch ladder, and panels render from demo data out of the box.
 - **Reliability panels.** Fail-closed health surface, context-pressure policy, token tracker, and metric-gated retention loop.
@@ -127,7 +127,7 @@ When a user installs/runs the Windows executable in this repo:
 1. The embedded shell server binds to localhost by default (`127.0.0.1:8911`) and serves `ui/dist/`.
 2. The Electron window points only at that local URL.
 3. Runtime control routes start/stop a process on the same machine the Servari shell is running on.
-4. Nothing in the current architecture makes the downloaded exe connect automatically to `mine` / another machine.
+4. Nothing in the current architecture makes the downloaded exe connect automatically to the developer's machine or any remote machine.
 
 If a user has not manually configured different hosts, all traffic remains local-first by default.
 

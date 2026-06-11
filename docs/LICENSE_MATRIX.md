@@ -4,7 +4,8 @@ This repository separates source code, documentation, generated artifacts, local
 
 | Area | Content | License / status | Notes |
 |---|---|---|---|
-| `servari-open` source | Python server, React UI source, Electron wrapper, scripts, project docs | Apache-2.0 | Covered by this repository's `LICENSE`. |
+| `servari-open` source | Python server, React UI source, Electron wrapper, scripts, project docs | Apache-2.0 with MIT-licensed portions under `server/hwfit/` (see `NOTICE`) | Covered by this repository's `LICENSE`. |
+| `server/hwfit/` | Model Cookbook port (hardware detection, model-fit math, serve profiles) | MIT (from the Odysseus project) inside the Apache-2.0 repo | Attribution and the full MIT text are in `NOTICE`. `server/hwfit/data/hf_models.json` is a bundled model catalog derived from Odysseus + Hugging Face Hub metadata. |
 | `agentic-os-audit` | Audit publication and written research docs | CC-BY-4.0 | Separate repository. It documents and audits the project; it is not the runnable source repo. |
 | `config.example.json` | Non-secret template | Apache-2.0 | Contains no real credentials. |
 | `config.json` | Operator-local provider config | Not committed | Gitignored. May contain local provider settings or credentials. |
@@ -18,7 +19,7 @@ This repository separates source code, documentation, generated artifacts, local
 
 ## Practical rule
 
-- Source repo: **Apache-2.0**.
+- Source repo: **Apache-2.0**, with MIT-licensed portions under `server/hwfit/` (see `NOTICE`).
 - Audit/publication repo: **CC-BY-4.0**.
 - Provider keys and local configuration: **never committed**.
 - Third-party dependencies: **their own upstream licenses**.

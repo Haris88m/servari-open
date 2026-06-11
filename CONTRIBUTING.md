@@ -51,6 +51,8 @@ Open an issue first describing the use case before writing code. A short
 5. **Do not commit secrets.** `config.json` is gitignored for a reason. Never put a
    real API key, token, or password anywhere in the tree — not even in an example.
 6. **Run the fresh-clone test above** and confirm the shell still boots.
+7. **Run the checks.** `python scripts/verify_all.py` must end `result: PASS (8/8)`,
+   and the pytest suite must pass: `python -m pytest tests/ -q`.
 
 ## What we are looking for
 

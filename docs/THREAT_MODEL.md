@@ -13,6 +13,7 @@ This document lists the main assets, threats, mitigations, and limits for the pu
 | Demo/custom data | Bundled demo data is synthetic; operator-provided data may be sensitive. |
 | Allow-listed actions | Any added action can become a side-effect boundary. |
 | Retention metric registry | Defines local commands used by the metric-gated retention loop. |
+| Managed engine subprocess | The `/api/engine/*` routes start/stop a local process from an operator-supplied interpreter path and working directory. |
 
 ## Threats and mitigations
 
@@ -23,6 +24,7 @@ This document lists the main assets, threats, mitigations, and limits for the pu
 | Accidental public exposure | Server binds to `127.0.0.1` by default. | No built-in authentication layer for public deployment. |
 | Arbitrary command execution through the action route | Action runner uses explicit allow-list; unknown actions are refused. | Contributors must not add unsafe actions. |
 | Operator-local command surface in retention metrics | Retention metrics use list-form subprocess calls from an operator-local registry, not shell strings, and are not exposed as a generic HTTP execution endpoint. | A malicious or careless local registry entry can still run local commands. Treat metric registries as trusted configuration. |
+| Arbitrary local process launch through `/api/engine/*` | Server binds to `127.0.0.1` by default; the engine routes are a documented trusted-operator surface, and `POST /api/engine/start` takes a caller-supplied interpreter path and working directory by design. | No per-route authentication: a hostile local process or a browser page issuing localhost requests (a CSRF-shaped abuse pattern) could trigger a local process launch. Put an authenticating reverse proxy in front if the server is ever exposed beyond the operator's machine. |
 | Gate bypass by autonomy level | Autonomy decision logic queues high-risk scores even at L5. | External executors must respect the verdict. |
 | Silent quality regression | Retention loop snapshots files and reverts when gating metrics degrade. | Only protects targets enrolled in a retention run with meaningful metrics. |
 | Missing module or data crashes the shell | Server routes are designed to return clean unavailable payloads. | Not every route/failure combination is exhaustively tested. |

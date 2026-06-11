@@ -51,6 +51,9 @@ Each is a standalone, stdlib-only, importable + CLI-runnable module:
 | `chat_byom.py` | (via `/api/say`, `/api/byom-status`) | the **BYOM chat backend** — reads `config.json`, calls your model's OpenAI-compatible endpoint, returns the reply. |
 | `voice.py` / `voice_neural.py` | `/api/voice-*` | optional **local STT + neural TTS** skeletons (faster-whisper + Piper). Load lazily in a background thread; the port binds first. |
 | `providers/*.py` | `/api/jobs`, `/api/applications`, `/api/career`, `/api/inbox`, `/api/finance`, `/api/memory-surface`, `/api/reports` | the **personal-world panels** — each a fail-closed reader over a `demo-data/` file. |
+| `hwfit/` | `/api/cookbook/scan`, `/api/cookbook/recommend` | the **Model Cookbook** — hardware-aware local-model recommendations: scans the machine profile (RAM, VRAM, CPU) and recommends open models that fit, from the bundled catalog `hwfit/data/hf_models.json`. MIT-licensed port from the Odysseus project (see `NOTICE`). |
+| engine runtime (in `servari_server.py`) | `/api/engine/status`, `/api/engine/logs`, `/api/engine/start`, `/api/engine/stop`, `/api/engine/restart` | the **engine runtime manager** — starts, stops, restarts, and reports on a locally managed subprocess. `start` accepts an interpreter path and working directory from the caller; a trusted-operator surface (see `SECURITY_MODEL.md`). |
+| `servari_cli.py` | (terminal entry, no HTTP route) | the **terminal session entry** — runs SERVARI as a persistent interactive CLI session; the public persona is loaded from `SERVARI.md`. |
 
 ### Home resolution
 

@@ -14,6 +14,8 @@ The public repository can reproduce:
 - append-only verify queue events,
 - allow-listed action runner behavior,
 - retention KEEP/REVERT self-test,
+- cookbook scan/recommend routes over the bundled model catalog,
+- the pytest unit suite (`python -m pytest tests/ -q`, 145 tests),
 - UI build from source.
 
 It does not reproduce a production multi-agent execution engine, AGI, frontier-model performance, or third-party certification.
@@ -128,7 +130,8 @@ Hosted providers require credentials from that provider. Do not commit `config.j
 GitHub Actions runs:
 
 1. `python-verification` — runs `python scripts/verify_all.py`.
-2. `ui-build` — installs UI dependencies and builds the React app.
+2. `python-tests` — runs the pytest unit suite (`python -m pytest tests/ -q`).
+3. `ui-build` — installs UI dependencies and builds the React app.
 
 The CI does not require secrets and does not call model providers.
 
@@ -143,6 +146,8 @@ Reproducible now:
 - allow-listed action runner,
 - retention self-test,
 - selected API route smoke checks,
+- cookbook scan/recommend routes,
+- the pytest unit suite,
 - UI build.
 
 Partial or not shipped:
