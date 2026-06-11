@@ -3,6 +3,7 @@
   "provider": "openai-compatible",
   "api_key": "",
   "model": "gpt-4o-mini",
+  "max_tokens": 2048,
   "base_url": "https://api.openai.com/v1",
   "backend": "api",
   "workspace_home": "",
@@ -14,6 +15,7 @@
     "api_key": "Leave empty for keyless local servers (Ollama / LM Studio). Required for hosted providers.",
     "backend": "Optional default terminal backend: api, claude, or codex.",
     "workspace_home": "Optional local workspace for Claude/Codex launches. If it contains AGENTS.md, the harness boots from that file. Keep private paths in your local config.json or SERVARI_WORKSPACE_HOME, never in source.",
-    "engine_allowed_pythons": "Optional list of EXTRA absolute interpreter paths POST /api/engine/start may launch (e.g. a venv python). The route always accepts bare python/python3 basenames, the shell's own interpreter, and SERVARI_ENGINE_PYTHON; any other path is refused fail-closed."
+    "engine_allowed_pythons": "Optional list of EXTRA absolute interpreter paths POST /api/engine/start may launch (e.g. a venv python). The route always accepts bare python/python3 basenames, the shell's own interpreter, and SERVARI_ENGINE_PYTHON; any other path is refused fail-closed.",
+    "max_tokens": "Reply-length cap sent as max_tokens. Some providers (e.g. OpenRouter) pre-authorize this against your balance; leaving it huge gets HTTP 402 on small balances. Default 2048."
   }
 }

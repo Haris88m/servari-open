@@ -129,6 +129,14 @@ def _to_messages(history, system: str | None = None) -> list:
     return msgs
 
 
+def _max_tokens(cfg) -> int:
+    """Reply-length cap from config.json "max_tokens" (default 2048, floor 1)."""
+    try:
+        return max(1, int(cfg.get("max_tokens") or 2048))
+    except Exception:
+        return 2048
+
+
 def reply(history, system: str | None = None) -> dict:
     """Answer the newest user turn via the configured model.
 
@@ -159,6 +167,12 @@ def reply(history, system: str | None = None) -> dict:
         "model": model,
         "messages": _to_messages(history, system=system),
         "stream": False,
+        # Explicit reply-length cap. Providers that pre-authorize max_tokens
+        # against the account balance (e.g. OpenRouter) treat an ABSENT cap as
+        # the model's full output window (65K+ on some models) and reject small
+        # balances with HTTP 402 before a single token is spent. config.json
+        # "max_tokens" overrides; default 2048 keeps replies roomy and cheap.
+        "max_tokens": _max_tokens(cfg),
     }).encode("utf-8")
 
     headers = {"Content-Type": "application/json"}
