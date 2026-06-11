@@ -1,13 +1,29 @@
 # SERVARI OS
 
-[![SERVARI verification](https://github.com/Haris88m/servari-open/actions/workflows/ci.yml/badge.svg)](https://github.com/Haris88m/servari-open/actions/workflows/ci.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
+[![License](https://img.shields.io/github/license/Haris88m/servari-open?color=blue)](./LICENSE)
+[![Stars](https://img.shields.io/github/stars/Haris88m/servari-open?style=flat&logo=github)](https://github.com/Haris88m/servari-open/stargazers)
+[![Forks](https://img.shields.io/github/forks/Haris88m/servari-open?style=flat&logo=github)](https://github.com/Haris88m/servari-open/network/members)
+[![Issues](https://img.shields.io/github/issues/Haris88m/servari-open)](https://github.com/Haris88m/servari-open/issues)
+[![CI](https://github.com/Haris88m/servari-open/actions/workflows/ci.yml/badge.svg)](https://github.com/Haris88m/servari-open/actions/workflows/ci.yml)
+[![Last commit](https://img.shields.io/github/last-commit/Haris88m/servari-open)](https://github.com/Haris88m/servari-open/commits)
 ![BYOM](https://img.shields.io/badge/BYOM-OpenAI--compatible-lightgrey)
 ![Local-first](https://img.shields.io/badge/local--first-127.0.0.1-lightgrey)
 
-**SERVARI OS is an open-source, local-first BYOM agentic OS shell.** It gives operators a controlled workspace for AI agents: chat, agent grid, autonomy dials, human verification queue, fail-closed health, token tracking, and metric-gated retention — all running locally.
+### An AI operator you can actually trust.
 
-SERVARI is the _shell and control plane_: a React desktop/web UI over a small Python standard-library server. The intelligence is your chosen model, wired through an OpenAI-compatible endpoint. The shell is what you see, control, verify, and audit.
+**SERVARI OS is an open-source, local-first BYOM agentic OS shell** — the shell and control plane for AI agents: your model, your machine, your gates. The intelligence is whatever you wire in through an OpenAI-compatible endpoint (hosted or local); the shell is what you see, control, verify, and audit. It gives operators a controlled workspace for AI agents: chat, agent grid, autonomy dials, human verification queue, fail-closed health, token tracking, and metric-gated retention — all running locally.
+
+- **Autonomy is a dial, not a switch.** A per-agent dial from **L0 to L5**. Higher levels widen what an agent may do on safe work — but high-risk actions (deploy, real-send, spend, publish, merge, secrets) park in the verification queue at every level, including L5.
+- **Every gate decision is append-only.** Pending events and decisions are written as separate JSONL lines. Nothing executes until you approve.
+- **Honest by design.** No model configured? It says so and records your turn — it never fabricates a reply.
+- **Local-first by default.** The server binds to `127.0.0.1`; your provider config lives in a gitignored `config.json`.
+- **Mechanically verified.** `python scripts/verify_all.py` checks the public claims — expected result: `PASS (8/8)`.
+
+No provider key needed to try it: the UI renders from bundled synthetic demo data on first run.
+
+What it is **not**: a foundation model, AGI, or a shipped concurrent multi-agent execution engine. See [`docs/CLAIM_REGISTER.md`](./docs/CLAIM_REGISTER.md) for the exact claim boundary.
+
+Under the hood it is a React desktop/web UI over a small Python standard-library server — the shell binds locally and serves the SPA plus a JSON control API.
 
 > Accurate public claim: SERVARI is an open-source, local-first BYOM agentic OS shell with mechanical autonomy gates, an append-only human verification queue, file-backed state, fail-closed health surfaces, and a metric-gated retention loop.
 
