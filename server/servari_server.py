@@ -327,64 +327,68 @@ def _engine_start(body: Optional[dict[str, object]] = None) -> dict[str, object]
             bufsize=1,
         )
 
-    proc: Optional[subprocess.Popen] = None
-    launch_mode = "uvicorn"
-    try:
-        proc = _spawn(uvicorn_cmd, launch_mode)
-    except Exception as e:
-        proc = None
-        _engine_append_log(f"uvicorn launch failed to spawn ({type(e).__name__}): {e}")
+    # Launch order: prefer `uvicorn app:app`, fall back to `python app.py`.
+    # The fallback must trigger whenever the uvicorn attempt fails to STAY UP, not
+    # only when it dies in the microseconds before the first poll(). `python -m
+    # uvicorn` on a runner without uvicorn installed exits with code 1, but the
+    # exit is async — proc.poll() immediately after Popen() can still be None, so a
+    # single post-spawn check misses it and the engine never falls back. We settle
+    # each attempt for a short window and only accept a process that survives it.
+    SETTLE_SEC = 0.15
 
-    if proc is None or proc.poll() is not None:
-        if proc is not None and proc.poll() is not None:
-            _engine_append_log(f"uvicorn exited quickly with code {proc.returncode}")
+    def _spawn_and_settle(cmd: list[str], mode: str) -> tuple[Optional[subprocess.Popen], Optional[int]]:
+        """Spawn cmd, wait SETTLE_SEC, and report (proc, exit_code).
+        exit_code is None when the process is still alive after settling (good);
+        otherwise it's the early-exit return code (caller should fall back/fail)."""
+        try:
+            p = _spawn(cmd, mode)
+        except Exception as e:  # FileNotFoundError (bad python), OSError, etc.
+            _engine_append_log(f"{mode} launch failed to spawn ({type(e).__name__}): {e}")
+            return None, None
+        # Drain stdout in the background so the log buffer captures the real error
+        # (e.g. "No module named uvicorn") even for an attempt that exits early.
+        threading.Thread(target=_engine_log_reader, args=(p,), daemon=True).start()
+        time.sleep(SETTLE_SEC)
+        rc = p.poll()
+        if rc is not None:
+            _engine_append_log(f"{mode} exited quickly with code {rc}")
             try:
-                proc.terminate()
+                p.terminate()
             except Exception:
                 pass
-            try:
-                with _ENGINE_LOCK:
-                    if _ENGINE_PROC is proc:
-                        _ENGINE_PROC = None
-            except Exception:
-                pass
+            return p, rc
+        return p, None
+
+    proc, uvicorn_rc = _spawn_and_settle(uvicorn_cmd, "uvicorn")
+    launch_mode = "uvicorn"
+
+    if proc is None or uvicorn_rc is not None:
+        # uvicorn was missing, failed to spawn, or exited immediately -> fall back
+        # to the stdlib CLI entrypoint (`python app.py`), which has no third-party
+        # dependency and survives on a bare runner.
         launch_mode = "cli"
         _engine_append_log("falling back to local app.py CLI")
-        try:
-            proc = _spawn(cli_cmd, launch_mode)
-        except Exception as e:
+        proc, cli_rc = _spawn_and_settle(cli_cmd, "cli")
+        if proc is None:
             return {
                 "ok": False,
                 "error": "spawn_failed",
-                "message": f"uvicorn unavailable and CLI fallback failed: {e}",
+                "message": "uvicorn unavailable and CLI fallback failed to spawn",
                 "config": cfg,
                 "status": _engine_live_state(),
             }
-
-    if proc is None:
-        return {
-            "ok": False,
-            "error": "spawn_failed",
-            "message": "engine launch produced no process",
-            "config": cfg,
-            "status": _engine_live_state(),
-        }
-
-    threading.Thread(target=_engine_log_reader, args=(proc,), daemon=True).start()
-
-    time.sleep(0.15)
-    if proc.poll() is not None:
-        with _ENGINE_LOCK:
-            _ENGINE_PROC = None
-            _ENGINE_CONFIG = None
-            _ENGINE_STARTED_AT = None
-        return {
-            "ok": False,
-            "error": "process_exit",
-            "message": f"engine process exited immediately (mode={launch_mode}, code={proc.returncode})",
-            "config": cfg,
-            "status": _engine_live_state(),
-        }
+        if cli_rc is not None:
+            with _ENGINE_LOCK:
+                _ENGINE_PROC = None
+                _ENGINE_CONFIG = None
+                _ENGINE_STARTED_AT = None
+            return {
+                "ok": False,
+                "error": "process_exit",
+                "message": f"engine process exited immediately (mode=cli, code={cli_rc})",
+                "config": cfg,
+                "status": _engine_live_state(),
+            }
 
     with _ENGINE_LOCK:
         _ENGINE_PROC = proc
