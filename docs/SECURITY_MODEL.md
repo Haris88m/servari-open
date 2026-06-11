@@ -17,7 +17,7 @@ Core controls:
 7. **Fail-graceful routes** — missing modules or missing data should return clean unavailable payloads instead of crashing the server.
 8. **Metric-gated retention** — enrolled files can be snapshotted, measured, and reverted byte-exactly if a gating metric degrades.
 9. **Synthetic demo data** — bundled data is seed/demo data.
-10. **Engine runtime routes are a trusted-operator surface** — `POST /api/engine/start` accepts a caller-supplied interpreter path (`python`) and working directory (`home`) and spawns a local process. Like the rest of the API it is unauthenticated on `127.0.0.1`, so treat it as trusted operator configuration (the same class as the retention metric registry); it is not hardened for hostile-localhost or browser-CSRF contexts.
+10. **Engine runtime routes are a guarded trusted-operator surface** — `POST /api/engine/start` spawns a local process, but two fail-closed gates run before any spawn: (a) the `python` value is validated against a closed interpreter allow-list (bare `python`/`python3`/`python.exe`/`python3.exe` basenames resolved via `PATH`, the shell's own interpreter, `SERVARI_ENGINE_PYTHON`, or absolute paths pre-declared in `config.json` `"engine_allowed_pythons"`) — anything else is refused as `engine_python_rejected`; and (b) every engine control POST must carry the custom `X-Servari-Engine` header or it is refused with HTTP 403. A cross-site page cannot attach a custom header without a CORS preflight the server never grants, which defeats browser-CSRF launches. The routes remain unauthenticated on `127.0.0.1`, so a hostile local process is still a trusted-operator concern (the same class as the retention metric registry).
 
 ## Operator responsibilities
 

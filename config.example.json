@@ -6,12 +6,14 @@
   "base_url": "https://api.openai.com/v1",
   "backend": "api",
   "workspace_home": "",
+  "engine_allowed_pythons": [],
   "_notes": {
     "provider": "A label for your own reference (e.g. 'openai', 'anthropic', 'ollama', 'openrouter'). The chat backend speaks the OpenAI-compatible /chat/completions shape, which most providers (and Ollama, LM Studio, vLLM, OpenRouter, Together, etc.) expose.",
     "base_url": "The provider's API base. Examples — OpenAI: https://api.openai.com/v1 · Ollama (local): http://127.0.0.1:11434/v1 · OpenRouter: https://openrouter.ai/api/v1 · LM Studio (local): http://127.0.0.1:1234/v1",
     "model": "The model id at that provider (e.g. 'gpt-4o-mini', 'llama3.1:8b', 'meta-llama/llama-3.1-8b-instruct').",
     "api_key": "Leave empty for keyless local servers (Ollama / LM Studio). Required for hosted providers.",
     "backend": "Optional default terminal backend: api, claude, or codex.",
-    "workspace_home": "Optional local workspace for Claude/Codex launches. If it contains AGENTS.md, the harness boots from that file. Keep private paths in your local config.json or SERVARI_WORKSPACE_HOME, never in source."
+    "workspace_home": "Optional local workspace for Claude/Codex launches. If it contains AGENTS.md, the harness boots from that file. Keep private paths in your local config.json or SERVARI_WORKSPACE_HOME, never in source.",
+    "engine_allowed_pythons": "Optional list of EXTRA absolute interpreter paths POST /api/engine/start may launch (e.g. a venv python). The route always accepts bare python/python3 basenames, the shell's own interpreter, and SERVARI_ENGINE_PYTHON; any other path is refused fail-closed."
   }
 }

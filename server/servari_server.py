@@ -181,6 +181,97 @@ def _engine_resolve_home(raw: str) -> Path:
     return p.resolve()
 
 
+# Engine-control hardening (docs/THREAT_MODEL.md, docs/SECURITY_MODEL.md):
+#   - the spawn interpreter is validated against a CLOSED policy
+#     (_engine_python_policy), so the JSON body can no longer name an
+#     arbitrary executable;
+#   - the POST control routes require the X-Servari-Engine header, which a
+#     cross-site browser request cannot attach without a CORS preflight this
+#     server never grants (anti-CSRF). Local processes remain a documented
+#     trusted-operator surface.
+_ENGINE_CONTROL_HEADER = "X-Servari-Engine"
+_ENGINE_PYTHON_BASENAMES = {"python", "python3", "python.exe", "python3.exe"}
+
+
+def _engine_config_allowed_pythons() -> list[str]:
+    """Operator-pre-declared interpreter paths: config.json "engine_allowed_pythons".
+    A missing/unreadable/malformed config admits NOTHING extra (fail-closed)."""
+    try:
+        cfg_path = ROOT / "config.json"
+        if not cfg_path.is_file():
+            return []
+        data = json.loads(cfg_path.read_text(encoding="utf-8", errors="replace"))
+        raw = data.get("engine_allowed_pythons") if isinstance(data, dict) else None
+        if not isinstance(raw, list):
+            return []
+        return [str(item).strip() for item in raw if str(item).strip()]
+    except Exception:
+        return []
+
+
+def _engine_norm_path(raw: str) -> str:
+    """Canonical form for interpreter-path comparison (case/8.3/symlink-safe)."""
+    try:
+        return os.path.normcase(str(Path(raw).expanduser().resolve()))
+    except Exception:
+        return os.path.normcase(str(raw))
+
+
+def _engine_python_policy(raw: str) -> tuple[Optional[str], Optional[str]]:
+    """Validate a requested engine interpreter. Returns (resolved, error).
+
+    Allowed (everything else is refused — fail-closed):
+      - bare basenames python/python3/python.exe/python3.exe, resolved via PATH;
+      - the interpreter running this server (sys.executable);
+      - the operator's SERVARI_ENGINE_PYTHON value;
+      - paths pre-declared in config.json "engine_allowed_pythons".
+    An allow-listed BASENAME does not bless a pathed executable: anyone able to
+    plant a file can name it python.exe, so a path value must match one of the
+    declared interpreters exactly (after normalization).
+    """
+    value = str(raw or "").strip()
+    if not value:
+        return sys.executable, None
+
+    if Path(value).name == value:  # bare basename: no separators, no drive
+        if value.lower() in _ENGINE_PYTHON_BASENAMES:
+            # PATH-miss falls through to the existence gate downstream
+            # (engine_python_not_found), which is the honest error for it.
+            return shutil.which(value) or value, None
+        return None, (f"interpreter basename '{value}' is not in the allow-list "
+                      f"{sorted(_ENGINE_PYTHON_BASENAMES)}")
+
+    declared = {_engine_norm_path(sys.executable)}
+    env_python = (os.environ.get("SERVARI_ENGINE_PYTHON", "") or "").strip()
+    if env_python:
+        declared.add(_engine_norm_path(env_python))
+    for entry in _engine_config_allowed_pythons():
+        declared.add(_engine_norm_path(entry))
+
+    if _engine_norm_path(value) in declared:
+        return value, None
+    return None, (f"interpreter path '{value}' is not declared: only the server's own "
+                  "interpreter, SERVARI_ENGINE_PYTHON, or config.json "
+                  '"engine_allowed_pythons" entries may be passed as a path')
+
+
+def _engine_csrf_error(headers) -> Optional[dict[str, object]]:
+    """The anti-CSRF gate for the engine control POSTs. None when the request
+    carries a non-empty X-Servari-Engine header; otherwise the 403 payload."""
+    try:
+        raw = headers.get(_ENGINE_CONTROL_HEADER)
+    except Exception:
+        raw = None
+    if (str(raw) if raw is not None else "").strip():
+        return None
+    return {
+        "ok": False,
+        "error": "engine_header_required",
+        "message": (f"engine control requires the {_ENGINE_CONTROL_HEADER} header "
+                    f"(anti-CSRF); send '{_ENGINE_CONTROL_HEADER}: 1'"),
+    }
+
+
 def _engine_status_probe(base_url: str, path: str) -> dict[str, object]:
     url = base_url.rstrip("/") + path
     start = time.perf_counter()
@@ -282,7 +373,17 @@ def _engine_start(body: Optional[dict[str, object]] = None) -> dict[str, object]
             "status": _engine_live_state(),
         }
 
-    py = str(cfg["python"]).strip() or sys.executable
+    py, policy_err = _engine_python_policy(str(cfg["python"]))
+    if policy_err is not None:
+        _engine_append_log(f"launch refused (interpreter policy): {policy_err}")
+        return {
+            "ok": False,
+            "error": "engine_python_rejected",
+            "message": policy_err,
+            "config": cfg,
+            "status": _engine_live_state(),
+        }
+    cfg["python"] = py
     if not Path(py).is_file():
         return {
             "ok": False,
@@ -1166,11 +1267,24 @@ class H(BaseHTTPRequestHandler):
                 ok = _append(p, "user", "[direct message] " + self._body().get("text", ""))
                 self._send(200, json.dumps({"ok": ok}))
         elif u.path == "/api/engine/start":
-            self._send(200, json.dumps(_engine_start(self._body())))
+            # Engine control is state-changing: anti-CSRF header gate first.
+            blocked = _engine_csrf_error(self.headers)
+            if blocked is not None:
+                self._send(403, json.dumps(blocked))
+            else:
+                self._send(200, json.dumps(_engine_start(self._body())))
         elif u.path == "/api/engine/stop":
-            self._send(200, json.dumps(_engine_stop()))
+            blocked = _engine_csrf_error(self.headers)
+            if blocked is not None:
+                self._send(403, json.dumps(blocked))
+            else:
+                self._send(200, json.dumps(_engine_stop()))
         elif u.path == "/api/engine/restart":
-            self._send(200, json.dumps(_engine_restart(self._body())))
+            blocked = _engine_csrf_error(self.headers)
+            if blocked is not None:
+                self._send(403, json.dumps(blocked))
+            else:
+                self._send(200, json.dumps(_engine_restart(self._body())))
         elif u.path == "/api/set-autonomy":
             # set an agent's autonomy level (autonomy.set_level) — own try/except, never crash.
             try:

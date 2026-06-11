@@ -120,6 +120,11 @@ SERVARI ships a bundled runtime-control surface at `/shell/runtime` and exposes 
 
 The `EngineRuntimeView` panel uses these endpoints to manage a local subprocess (start/stop/restart), read status, and stream recent logs. These routes are served by the same Python shell process that serves the UI on the same host.
 
+The three control POSTs are hardened (see `docs/THREAT_MODEL.md`):
+
+- **Anti-CSRF header.** Every `POST /api/engine/*` request must carry the custom `X-Servari-Engine` header (any non-empty value) or it is refused with HTTP 403 before any work happens. The bundled SPA sends it automatically; from the command line: `curl -X POST http://127.0.0.1:8911/api/engine/start -H "X-Servari-Engine: 1" -H "Content-Type: application/json" -d "{}"`.
+- **Interpreter allow-list.** The `python` value in the start/restart body is validated fail-closed. Accepted: bare basenames `python` / `python3` / `python.exe` / `python3.exe` (resolved via `PATH`), the shell's own interpreter, the `SERVARI_ENGINE_PYTHON` value, or absolute paths pre-declared in `config.json` under `"engine_allowed_pythons"`. Anything else returns `engine_python_rejected` and nothing is spawned.
+
 ### Runtime behavior for the downloaded exe
 
 When a user installs/runs the Windows executable in this repo:

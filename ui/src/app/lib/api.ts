@@ -76,7 +76,10 @@ export interface GridPane {
 
 // Safe accessors for GridPane.turns (server sends an array; legacy callers
 // expected a number). Use these everywhere instead of touching pane.turns raw.
-export function paneTurnCount(pane: { turns?: unknown; total?: number }): number {
+export function paneTurnCount(pane: {
+  turns?: unknown;
+  total?: number;
+}): number {
   if (Array.isArray(pane.turns)) return pane.turns.length;
   if (typeof pane.turns === "number") return pane.turns;
   if (typeof pane.total === "number") return pane.total;
@@ -328,7 +331,14 @@ export interface ReportsResponse {
 export interface AgentStatusCell {
   id: string;
   display_name: string;
-  status: "live" | "working" | "idle" | "done" | "blocked" | "error" | "not_started";
+  status:
+    | "live"
+    | "working"
+    | "idle"
+    | "done"
+    | "blocked"
+    | "error"
+    | "not_started";
   current_task: string;
   latest_reply: string;
   latest_reply_ts: string | null;
@@ -427,20 +437,29 @@ export interface VoiceTranscribeResponse {
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(path, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
+    method: "GET",
+    headers: { Accept: "application/json" },
   });
   return (await res.json()) as T;
 }
 
-async function postJSON<T>(path: string, body?: unknown): Promise<T> {
+async function postJSON<T>(
+  path: string,
+  body?: unknown,
+  headers?: Record<string, string>,
+): Promise<T> {
   const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(headers ?? {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return (await res.json()) as T;
 }
+
+// The engine control routes require this anti-CSRF header: a cross-site page
+// cannot attach a custom header without a CORS preflight the server never
+// grants, so its presence proves the request came from a same-origin client.
+const ENGINE_CONTROL_HEADERS = { "X-Servari-Engine": "1" };
 
 function qs(params: Record<string, string | number | undefined>): string {
   const parts: string[] = [];
@@ -448,7 +467,7 @@ function qs(params: Record<string, string | number | undefined>): string {
     if (v === undefined || v === null) continue;
     parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
   }
-  return parts.length ? `?${parts.join('&')}` : '';
+  return parts.length ? `?${parts.join("&")}` : "";
 }
 
 // ---------------------------------------------------------------------------
@@ -458,10 +477,10 @@ function qs(params: Record<string, string | number | undefined>): string {
 export const API = {
   // --- chat / state ---
   state(): Promise<StateResponse> {
-    return getJSON<StateResponse>('/api/state');
+    return getJSON<StateResponse>("/api/state");
   },
   say(text: string): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/say', { text });
+    return postJSON<OkResponse>("/api/say", { text });
   },
   agentSay(name: string, text: string): Promise<OkResponse> {
     return postJSON<OkResponse>(`/api/agent-say${qs({ name })}`, { text });
@@ -472,15 +491,15 @@ export const API = {
 
   // --- the process grid ---
   grid(): Promise<GridResponse> {
-    return getJSON<GridResponse>('/api/grid');
+    return getJSON<GridResponse>("/api/grid");
   },
 
   // --- org / launch / briefs ---
   org(): Promise<OrgResponse> {
-    return getJSON<OrgResponse>('/api/org');
+    return getJSON<OrgResponse>("/api/org");
   },
   launch(): Promise<LaunchResponse> {
-    return getJSON<LaunchResponse>('/api/launch');
+    return getJSON<LaunchResponse>("/api/launch");
   },
   agentBrief(name: string): Promise<AgentBriefResponse> {
     return getJSON<AgentBriefResponse>(`/api/agent-brief${qs({ name })}`);
@@ -488,50 +507,55 @@ export const API = {
 
   // --- autonomy dials ---
   autonomy(): Promise<AutonomyResponse> {
-    return getJSON<AutonomyResponse>('/api/autonomy');
+    return getJSON<AutonomyResponse>("/api/autonomy");
   },
   setAutonomy(agent: string, level: number | string): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/set-autonomy', { agent, level });
+    return postJSON<OkResponse>("/api/set-autonomy", { agent, level });
   },
 
   // --- fast-verify gate queue ---
   verifyQueue(): Promise<VerifyQueueResponse> {
-    return getJSON<VerifyQueueResponse>('/api/verify-queue');
+    return getJSON<VerifyQueueResponse>("/api/verify-queue");
   },
-  verifyDecide(id: string, decision: string, note = ''): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/verify-decision', { id, decision, note });
+  verifyDecide(id: string, decision: string, note = ""): Promise<OkResponse> {
+    return postJSON<OkResponse>("/api/verify-decision", { id, decision, note });
   },
 
   // --- service health ---
   health(): Promise<HealthCheckResponse> {
-    return getJSON<HealthCheckResponse>('/api/health');
+    return getJSON<HealthCheckResponse>("/api/health");
   },
 
   // --- metric-gated retention loop ---
   retention(): Promise<RetentionResponse> {
-    return getJSON<RetentionResponse>('/api/retention');
+    return getJSON<RetentionResponse>("/api/retention");
   },
   retentionDecide(runId: string): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/retention-decide', { run_id: runId });
+    return postJSON<OkResponse>("/api/retention-decide", { run_id: runId });
   },
 
   // --- context pressure + survival pins ---
   context(): Promise<ContextResponse> {
-    return getJSON<ContextResponse>('/api/context');
+    return getJSON<ContextResponse>("/api/context");
   },
-  contextCheckpoint(note = 'via SERVARI shell'): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/context-checkpoint', { note });
+  contextCheckpoint(note = "via SERVARI shell"): Promise<OkResponse> {
+    return postJSON<OkResponse>("/api/context-checkpoint", { note });
   },
 
   // --- proof-of-work tokens ---
   tokens(): Promise<TokensResponse> {
-    return getJSON<TokensResponse>('/api/tokens');
+    return getJSON<TokensResponse>("/api/tokens");
   },
   tokensSessions(limit = 20): Promise<TokensSessionsResponse> {
-    return getJSON<TokensSessionsResponse>(`/api/tokens-sessions${qs({ limit })}`);
+    return getJSON<TokensSessionsResponse>(
+      `/api/tokens-sessions${qs({ limit })}`,
+    );
   },
-  tokensReport(scope: string, sessionId?: string): Promise<TokensReportResponse> {
-    return postJSON<TokensReportResponse>('/api/tokens-report', {
+  tokensReport(
+    scope: string,
+    sessionId?: string,
+  ): Promise<TokensReportResponse> {
+    return postJSON<TokensReportResponse>("/api/tokens-report", {
       scope,
       session_id: sessionId,
     });
@@ -539,65 +563,80 @@ export const API = {
 
   // --- personal-world endpoints ---
   jobs(): Promise<JobsResponse> {
-    return getJSON<JobsResponse>('/api/jobs');
+    return getJSON<JobsResponse>("/api/jobs");
   },
   applications(): Promise<ApplicationsResponse> {
-    return getJSON<ApplicationsResponse>('/api/applications');
+    return getJSON<ApplicationsResponse>("/api/applications");
   },
   career(): Promise<CareerProfile> {
-    return getJSON<CareerProfile>('/api/career');
+    return getJSON<CareerProfile>("/api/career");
   },
   inbox(): Promise<InboxResponse> {
-    return getJSON<InboxResponse>('/api/inbox');
+    return getJSON<InboxResponse>("/api/inbox");
   },
   finance(): Promise<FinanceResponse> {
-    return getJSON<FinanceResponse>('/api/finance');
+    return getJSON<FinanceResponse>("/api/finance");
   },
   memorySurface(): Promise<MemorySurfaceResponse> {
-    return getJSON<MemorySurfaceResponse>('/api/memory-surface');
+    return getJSON<MemorySurfaceResponse>("/api/memory-surface");
   },
   reports(): Promise<ReportsResponse> {
-    return getJSON<ReportsResponse>('/api/reports');
+    return getJSON<ReportsResponse>("/api/reports");
   },
 
   // --- orchestration workspace ---
   agentsStatus(): Promise<AgentsStatusResponse> {
-    return getJSON<AgentsStatusResponse>('/api/agents/status');
+    return getJSON<AgentsStatusResponse>("/api/agents/status");
   },
 
   // --- standing-order actions ---
   actions(): Promise<ActionsResponse> {
-    return getJSON<ActionsResponse>('/api/actions');
+    return getJSON<ActionsResponse>("/api/actions");
   },
   run(action: string): Promise<RunResponse> {
     return getJSON<RunResponse>(`/api/run${qs({ action })}`);
   },
   // --- engine lifecycle ---
   engineStatus(): Promise<EngineStatusResponse> {
-    return getJSON<EngineStatusResponse>('/api/engine/status');
+    return getJSON<EngineStatusResponse>("/api/engine/status");
   },
   engineLogs(lines?: number): Promise<EngineLogsResponse> {
     return getJSON<EngineLogsResponse>(`/api/engine/logs${qs({ lines })}`);
   },
   engineStart(config: EngineConfig = {}): Promise<EngineActionResponse> {
-    return postJSON<EngineActionResponse>('/api/engine/start', config);
+    return postJSON<EngineActionResponse>(
+      "/api/engine/start",
+      config,
+      ENGINE_CONTROL_HEADERS,
+    );
   },
   engineStop(): Promise<EngineActionResponse> {
-    return postJSON<EngineActionResponse>('/api/engine/stop');
+    return postJSON<EngineActionResponse>(
+      "/api/engine/stop",
+      undefined,
+      ENGINE_CONTROL_HEADERS,
+    );
   },
   engineRestart(config: EngineConfig = {}): Promise<EngineActionResponse> {
-    return postJSON<EngineActionResponse>('/api/engine/restart', config);
+    return postJSON<EngineActionResponse>(
+      "/api/engine/restart",
+      config,
+      ENGINE_CONTROL_HEADERS,
+    );
   },
 
   // --- voice ---
   voiceConfig(): Promise<VoiceConfigResponse> {
-    return getJSON<VoiceConfigResponse>('/api/voice-config');
+    return getJSON<VoiceConfigResponse>("/api/voice-config");
   },
-  async voiceTranscribe(blob: Blob, lang = 'en'): Promise<VoiceTranscribeResponse> {
+  async voiceTranscribe(
+    blob: Blob,
+    lang = "en",
+  ): Promise<VoiceTranscribeResponse> {
     // The server reads RAW audio bytes off the wire (NOT a JSON body).
     const res = await fetch(`/api/voice-transcribe${qs({ language: lang })}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream' },
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
       body: blob,
     });
     return (await res.json()) as VoiceTranscribeResponse;

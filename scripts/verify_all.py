@@ -250,14 +250,20 @@ def _get_json(path: str) -> Dict[str, Any]:
     return json.loads(raw)
 
 
-def _post_json(path: str, payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def _post_json(path: str, payload: Dict[str, Any] | None = None, *,
+               engine_header: bool = True) -> Dict[str, Any]:
     url = f"http://127.0.0.1:{TEST_PORT}{path}"
     body = json.dumps(payload or {}).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if engine_header:
+        # The engine control routes require this anti-CSRF header; sending it
+        # from the harness mirrors what the SPA client does.
+        headers["X-Servari-Engine"] = "verify-all"
     req = urllib.request.Request(
         url,
         method="POST",
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
     )
     with urllib.request.urlopen(req, timeout=8) as resp:
         raw = resp.read().decode("utf-8", errors="replace")
@@ -385,6 +391,26 @@ def check_engine_control_payload(base_status: Dict[str, Any]) -> Dict[str, Any]:
         "auth_enabled": False,
     }
 
+    # Hardening gate 1 (anti-CSRF): a POST without the X-Servari-Engine header
+    # must be refused with HTTP 403 before any engine work happens.
+    try:
+        _post_json("/api/engine/start", start_cfg, engine_header=False)
+        raise AssertionError("engine start without X-Servari-Engine header was not refused")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 403, exc.code
+        refused_csrf = json.loads(exc.read().decode("utf-8", errors="replace"))
+    assert refused_csrf.get("error") == "engine_header_required", refused_csrf
+
+    # Hardening gate 2 (interpreter policy): an executable outside the operator
+    # allow-list is rejected fail-closed — no spawn — even with the header.
+    evil = TEST_HOME / "evil-interpreter.exe"
+    evil.write_text("not a python", encoding="utf-8")
+    rejected = _post_json("/api/engine/start", {**start_cfg, "python": str(evil)})
+    assert rejected.get("ok") is False, rejected
+    assert rejected.get("error") == "engine_python_rejected", rejected
+    after_reject = _get_json("/api/engine/status")
+    assert bool(after_reject.get("status", {}).get("running")) is False, after_reject
+
     start = None
     restart = None
     stopped = None
@@ -413,6 +439,9 @@ def check_engine_control_payload(base_status: Dict[str, Any]) -> Dict[str, Any]:
         logs_started = final_logs.get("logs", [])
         assert isinstance(logs_started, list), final_logs
         return {
+            "csrf_refused": refused_csrf,
+            "python_rejected": {"error": rejected.get("error"),
+                                "message": rejected.get("message")},
             "start": start,
             "restart": restart,
             "stop": stopped,
