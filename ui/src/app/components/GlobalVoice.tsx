@@ -92,7 +92,11 @@ function ChatBubble({ turn, isUser }: { turn: Turn; isUser: boolean }) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export function GlobalVoice() {
+interface GlobalVoiceProps {
+  showMiniChat?: boolean;
+}
+
+export function GlobalVoice({ showMiniChat = true }: GlobalVoiceProps) {
   const [convState, setConvState] = useState<ConversationState>("idle");
   const [inConversation, setInConversation] = useState(false);
   const [amplitude, setAmplitude] = useState(0);
@@ -156,7 +160,7 @@ export function GlobalVoice() {
 
   // Start/stop polling when the panel is open
   useEffect(() => {
-    if (chatOpen) {
+    if (showMiniChat && chatOpen) {
       void fetchChatTurns();
       chatPollRef.current = setInterval(() => void fetchChatTurns(), 2500);
     } else {
@@ -171,12 +175,12 @@ export function GlobalVoice() {
         chatPollRef.current = null;
       }
     };
-  }, [chatOpen, fetchChatTurns]);
+  }, [chatOpen, fetchChatTurns, showMiniChat]);
 
   // Also refresh turns when a new voice reply lands
   const refreshChat = useCallback(() => {
-    if (chatOpen) void fetchChatTurns();
-  }, [chatOpen, fetchChatTurns]);
+    if (showMiniChat && chatOpen) void fetchChatTurns();
+  }, [chatOpen, fetchChatTurns, showMiniChat]);
 
   // -------------------------------------------------------------------------
   // Amplitude handler
@@ -293,7 +297,9 @@ export function GlobalVoice() {
     setVoiceError(null);
     setInConversation(true);
     setConvState("listening");
-    setChatOpen(true);
+    if (showMiniChat) {
+      setChatOpen(true);
+    }
     primedRef.current = false;
     void latestSystemTurn().then((n) => {
       if (!primedRef.current) {
@@ -309,7 +315,9 @@ export function GlobalVoice() {
       onInterim: (text) => {
         setPartialText(text);
         // Auto-open the chat panel so partial text is visible.
-        setChatOpen(true);
+        if (showMiniChat) {
+          setChatOpen(true);
+        }
       },
       onUserSaid: (t) => void handleUserSaid(t),
       onError: (reason) => {
@@ -323,7 +331,7 @@ export function GlobalVoice() {
         }
       },
     });
-  }, [handleUserSaid, onAmp, latestSystemTurn]);
+  }, [handleUserSaid, onAmp, latestSystemTurn, showMiniChat]);
 
   const stopConversation = useCallback(() => {
     void Voice.stopConversation();
@@ -387,8 +395,8 @@ export function GlobalVoice() {
   // Derived display state
   // -------------------------------------------------------------------------
   const expanded = inConversation;
-  // The chat panel is visible if the conversation is live OR user toggled it
-  const chatPanelVisible = chatOpen;
+  // The chat panel is visible only when enabled for this route.
+  const chatPanelVisible = showMiniChat && chatOpen;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 pointer-events-none">
@@ -634,6 +642,7 @@ export function GlobalVoice() {
       {/* ------------------------------------------------------------------ */}
       <div className="pointer-events-auto flex items-center gap-2">
         {/* Chat toggle button — opens the panel without starting voice */}
+        {showMiniChat && (
         <motion.button
           onClick={toggleChat}
           className="relative w-[40px] h-[40px] rounded-full flex items-center justify-center"
@@ -661,6 +670,7 @@ export function GlobalVoice() {
             />
           </svg>
         </motion.button>
+        )}
 
         {/* Main mic / orb button */}
         <motion.button

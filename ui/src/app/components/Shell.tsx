@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation, useOutlet, useNavigate } from "react-router";
+import { useLocation, useNavigate, useOutlet } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { TopBar } from "./TopBar";
 import { Dock } from "./Dock";
@@ -22,9 +22,12 @@ export function Shell() {
   const [isFocusOpen, setIsFocusOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const dockWidth =
+    isDockExpanded || isDockPinned ? DOCK_EXPANDED_WIDTH : DOCK_COLLAPSED_WIDTH;
+  const isChatRoute = location.pathname === "/shell/chat";
 
   // Ctrl+Shift+F -> FocusMode toggle
-  // Ctrl+K -> open /shell/chat (single chat surface)
+  // Ctrl+K -> Open the chat route
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && (e.key === "F" || e.key === "f")) {
@@ -33,7 +36,7 @@ export function Shell() {
       }
       if (e.ctrlKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
-        navigate("/shell/chat");
+        void navigate("/shell/chat");
       }
     };
     window.addEventListener("keydown", onKey);
@@ -96,11 +99,8 @@ export function Shell() {
         <main
           className="flex-1 relative overflow-auto"
           style={{
-            marginLeft:
-              isDockExpanded || isDockPinned
-                ? DOCK_EXPANDED_WIDTH
-                : DOCK_COLLAPSED_WIDTH,
-            transition: "margin-left 0.38s cubic-bezier(0.22,1,0.36,1)",
+            marginLeft: dockWidth,
+            transition: "margin-left 0.28s cubic-bezier(0.22,1,0.36,1)",
           }}
         >
           <AnimatePresence mode="wait">
@@ -119,7 +119,7 @@ export function Shell() {
       </div>
 
       {/* GLOBAL VOICE — survives navigation */}
-      <GlobalVoice />
+      <GlobalVoice showMiniChat={!isChatRoute} />
 
       {/* Process Table Overlay */}
       {isProcessTableOpen && (
