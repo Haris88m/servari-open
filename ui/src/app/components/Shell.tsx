@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation, useOutlet } from "react-router";
+import { useLocation, useOutlet, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { TopBar } from "./TopBar";
 import { Dock } from "./Dock";
@@ -8,22 +8,23 @@ import { AmbientBackground } from "./AmbientBackground";
 import { BackgroundFX } from "./BackgroundFX";
 import { FocusMode } from "./FocusMode";
 import { GlobalVoice } from "./GlobalVoice";
-import { ChatPanel } from "./ChatPanel";
 
 // Stage transition: old stage fades + slides 12px down on the way out,
 // new stage fades + slides up on the way in. Custom ease, never linear.
 const STAGE_EASE = [0.22, 1, 0.36, 1] as const;
+const DOCK_COLLAPSED_WIDTH = 64;
+const DOCK_EXPANDED_WIDTH = 210;
 
 export function Shell() {
   const [isDockExpanded, setIsDockExpanded] = useState(false);
   const [isDockPinned, setIsDockPinned] = useState(false);
   const [isProcessTableOpen, setIsProcessTableOpen] = useState(false);
   const [isFocusOpen, setIsFocusOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
-  // Ctrl+Shift+F → FocusMode toggle
-  // Ctrl+K → ChatPanel toggle
+  // Ctrl+Shift+F -> FocusMode toggle
+  // Ctrl+K -> open /shell/chat (single chat surface)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && (e.key === "F" || e.key === "f")) {
@@ -32,12 +33,12 @@ export function Shell() {
       }
       if (e.ctrlKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
-        setIsChatOpen((v) => !v);
+        navigate("/shell/chat");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [navigate]);
 
   const outlet = useOutlet();
 
@@ -91,12 +92,15 @@ export function Shell() {
           onPinChange={setIsDockPinned}
         />
 
-        {/* Stage — shrinks right margin when chat panel is open */}
+        {/* Stage content */}
         <main
           className="flex-1 relative overflow-auto"
           style={{
-            marginRight: isChatOpen ? 380 : 0,
-            transition: "margin-right 0.38s cubic-bezier(0.22,1,0.36,1)",
+            marginLeft:
+              isDockExpanded || isDockPinned
+                ? DOCK_EXPANDED_WIDTH
+                : DOCK_COLLAPSED_WIDTH,
+            transition: "margin-left 0.38s cubic-bezier(0.22,1,0.36,1)",
           }}
         >
           <AnimatePresence mode="wait">
@@ -116,39 +120,6 @@ export function Shell() {
 
       {/* GLOBAL VOICE — survives navigation */}
       <GlobalVoice />
-
-      {/* CHAT PANEL — slide-in from right, Ctrl+K toggles */}
-      <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
-
-      {/* Floating chat trigger — bottom-right, above GlobalVoice */}
-      <AnimatePresence>
-        {!isChatOpen && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            onClick={() => setIsChatOpen(true)}
-            className="fixed bottom-20 right-5 z-30 rounded-full grid place-items-center"
-            style={{
-              width: 48,
-              height: 48,
-              background: "var(--s-panel)",
-              border: "1px solid var(--s-edge-accent)",
-              boxShadow: "var(--s-glow-teal)",
-            }}
-            whileHover={{ scale: 1.08, boxShadow: "var(--s-glow-primary)" }}
-            whileTap={{ scale: 0.95 }}
-            title="Open SERVARI chat (Ctrl+K)"
-          >
-            <img
-              src="/raven.png"
-              alt="Chat"
-              style={{ width: 24, height: 24, objectFit: "contain", filter: "drop-shadow(0 0 4px rgba(20,156,150,0.6))" }}
-              draggable={false}
-            />
-          </motion.button>
-        )}
-      </AnimatePresence>
 
       {/* Process Table Overlay */}
       {isProcessTableOpen && (
