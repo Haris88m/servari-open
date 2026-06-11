@@ -7,7 +7,7 @@
 
 **SERVARI OS is an open-source, local-first BYOM agentic OS shell.** It gives operators a controlled workspace for AI agents: chat, agent grid, autonomy dials, human verification queue, fail-closed health, token tracking, and metric-gated retention — all running locally.
 
-SERVARI is the *shell and control plane*: a React desktop/web UI over a small Python standard-library server. The intelligence is your chosen model, wired through an OpenAI-compatible endpoint. The shell is what you see, control, verify, and audit.
+SERVARI is the _shell and control plane_: a React desktop/web UI over a small Python standard-library server. The intelligence is your chosen model, wired through an OpenAI-compatible endpoint. The shell is what you see, control, verify, and audit.
 
 > Accurate public claim: SERVARI is an open-source, local-first BYOM agentic OS shell with mechanical autonomy gates, an append-only human verification queue, file-backed state, fail-closed health surfaces, and a metric-gated retention loop.
 
@@ -70,16 +70,16 @@ The multi-agent workspace surface is present. A concurrent autonomous execution 
 
 See [`./docs/screenshots/`](./docs/screenshots/) for the full set.
 
-| | |
-|---|---|
-| Boot sequence | ![boot](./docs/screenshots/00-boot.png) |
+|                        |                                                   |
+| ---------------------- | ------------------------------------------------- |
+| Boot sequence          | ![boot](./docs/screenshots/00-boot.png)           |
 | Dashboard / agent grid | ![dashboard](./docs/screenshots/01-dashboard.png) |
-| Chat | ![chat](./docs/screenshots/02-chat.png) |
-| Org chart | ![org](./docs/screenshots/03-org-chart.png) |
-| Autonomy dials | ![autonomy](./docs/screenshots/04-autonomy.png) |
-| Fast-verify gates | ![gates](./docs/screenshots/05-gates.png) |
-| Agent workspace | ![agents](./docs/screenshots/06-agents.png) |
-| Runtime console | ![runtime](./docs/screenshots/07-runtime.png) |
+| Chat                   | ![chat](./docs/screenshots/02-chat.png)           |
+| Org chart              | ![org](./docs/screenshots/03-org-chart.png)       |
+| Autonomy dials         | ![autonomy](./docs/screenshots/04-autonomy.png)   |
+| Fast-verify gates      | ![gates](./docs/screenshots/05-gates.png)         |
+| Agent workspace        | ![agents](./docs/screenshots/06-agents.png)       |
+| Runtime console        | ![runtime](./docs/screenshots/07-runtime.png)     |
 
 ---
 
@@ -199,7 +199,7 @@ follow that file as the source of truth. This is how the same shell can start a
 Claude session, a Codex/GPT session, or direct BYOM chat without hardcoding a
 private path into the public repo.
 
-For APEX PRIME run modes, point to your private workspace once:
+For private-workspace harness launches, point to your workspace once:
 
 ```bash
 servari.cmd cli --backend codex --workspace "C:\\path\\to\\your\\servari-workspace"
@@ -211,12 +211,12 @@ servari.cmd cli --backend codex --workspace "C:\\path\\to\\your\\servari-workspa
 
 SERVARI speaks the OpenAI-compatible `/chat/completions` shape. Copy `config.example.json` to `config.json` and set:
 
-| field | what it is | examples |
-|---|---|---|
-| `base_url` | provider API base | OpenAI, OpenRouter, Ollama, LM Studio, vLLM, Together |
-| `model` | model id at that provider | `gpt-4o-mini`, `llama3.1:8b`, provider-specific ids |
-| `api_key` | provider credential if required | empty for keyless local servers |
-| `provider` | your own label | `openai`, `ollama`, `openrouter` |
+| field      | what it is                      | examples                                              |
+| ---------- | ------------------------------- | ----------------------------------------------------- |
+| `base_url` | provider API base               | OpenAI, OpenRouter, Ollama, LM Studio, vLLM, Together |
+| `model`    | model id at that provider       | `gpt-4o-mini`, `llama3.1:8b`, provider-specific ids   |
+| `api_key`  | provider credential if required | empty for keyless local servers                       |
+| `provider` | your own label                  | `openai`, `ollama`, `openrouter`                      |
 
 `config.json` is gitignored. Check `GET /api/byom-status` or run:
 
