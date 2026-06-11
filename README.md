@@ -100,6 +100,7 @@ The current full set of stills lives in [`./docs/screenshots/`](./docs/screensho
 ## What you get
 
 - **Bring your own model (BYOM).** Point SERVARI at any OpenAI-compatible chat endpoint — OpenAI, OpenRouter, Together, Ollama, LM Studio, vLLM, or similar. Your provider config lives in gitignored `config.json`.
+- **Model Cookbook.** Hardware-aware local-model recommendations: the shell reads your machine profile (RAM, VRAM, CPU) and suggests open models that actually fit it, from a ~900-entry catalog. Ported from the MIT-licensed Odysseus project, with attribution in [NOTICE](./NOTICE).
 - **Gate-controlled autonomy.** A per-agent dial from **L0** to **L5**. Higher levels widen what an agent may do on safe work, but high-risk work parks in the fast-verify queue at every level.
 - **Live workspace surface.** Agent channels, org chart, process-table overlay, launch ladder, and panels render from demo data out of the box.
 - **Reliability panels.** Fail-closed health surface, context-pressure policy, token tracker, and metric-gated retention loop.
@@ -316,3 +317,7 @@ To wire your own data, edit the files in `demo-data/` or point `SERVARI_HOME` at
 ## License
 
 Source code is licensed under [Apache License 2.0](./LICENSE) © The SERVARI OS Project. See [NOTICE](./NOTICE) and [docs/LICENSE_MATRIX.md](./docs/LICENSE_MATRIX.md) for third-party attribution and license boundaries.
+
+---
+
+If SERVARI is useful to you, [a star on GitHub](https://github.com/Haris88m/servari-open) helps other operators find it.
