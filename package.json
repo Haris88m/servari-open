@@ -2,6 +2,13 @@
   "name": "servari-shell",
   "version": "2.0.0",
   "private": true,
+  "license": "Apache-2.0",
+  "author": "Haris Mekic (MEKreflect)",
+  "homepage": "https://github.com/Haris88m/servari-open",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Haris88m/servari-open.git"
+  },
   "description": "SERVARI — the operating-system shell. Electron window over the SERVARI server (127.0.0.1:8911).",
   "main": "electron/main.cjs",
   "scripts": {
