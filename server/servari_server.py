@@ -1071,6 +1071,49 @@ class H(BaseHTTPRequestHandler):
                 self._send(200, json.dumps({"reports": [], "error": "providers/reports.py not available"}))
             except Exception as e:
                 self._send(200, json.dumps({"reports": [], "error": str(e)}))
+        # ------------------------------------------------------------------
+        # MODEL COOKBOOK — /cookbook/scan + /cookbook/recommend (also served
+        # under /api/ like the other JSON routes). Hardware-aware model
+        # recommendations from server/hwfit/, ported from Odysseus (MIT — see
+        # NOTICE). Local-only, lazy-imported, degrades gracefully on GPU-less
+        # and sandboxed machines (the scan never raises; it reports a valid
+        # CPU-only profile instead).
+        # ------------------------------------------------------------------
+        elif u.path in ("/cookbook/scan", "/api/cookbook/scan"):
+            try:
+                from hwfit import hardware as _hwfit_hw
+                fresh = (parse_qs(u.query).get("fresh") or ["0"])[0].lower() in ("1", "true", "yes")
+                self._send(200, json.dumps({"ok": True, "system": _hwfit_hw.detect_system(fresh=fresh)}))
+            except ModuleNotFoundError:
+                self._send(200, json.dumps({"ok": False, "system": {},
+                                            "error": "server/hwfit package not available"}))
+            except Exception as e:
+                self._send(200, json.dumps({"ok": False, "system": {},
+                                            "error": f"cookbook scan failed: {type(e).__name__}"}))
+        elif u.path in ("/cookbook/recommend", "/api/cookbook/recommend"):
+            try:
+                from hwfit import hardware as _hwfit_hw
+                from hwfit import fit as _hwfit_fit
+                q = parse_qs(u.query)
+                use_case = (q.get("use_case") or [""])[0].strip() or None
+                search = (q.get("search") or [""])[0].strip() or None
+                sort = (q.get("sort") or ["score"])[0]
+                fit_only = (q.get("fit_only") or ["0"])[0].lower() in ("1", "true", "yes")
+                try:
+                    limit = max(1, min(int((q.get("limit") or ["20"])[0]), 100))
+                except ValueError:
+                    limit = 20
+                system = _hwfit_hw.detect_system()
+                recs = _hwfit_fit.rank_models(system, use_case=use_case, limit=limit,
+                                              search=search, sort=sort, fit_only=fit_only)
+                self._send(200, json.dumps({"ok": True, "system": system,
+                                            "recommendations": recs, "count": len(recs)}))
+            except ModuleNotFoundError:
+                self._send(200, json.dumps({"ok": False, "recommendations": [],
+                                            "error": "server/hwfit package not available"}))
+            except Exception as e:
+                self._send(200, json.dumps({"ok": False, "recommendations": [],
+                                            "error": f"cookbook recommend failed: {type(e).__name__}"}))
         else:
             self._send(404, json.dumps({"error": "not found"}))
 
