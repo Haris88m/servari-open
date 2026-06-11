@@ -82,20 +82,18 @@ The multi-agent workspace surface is present. A concurrent autonomous execution 
 
 ---
 
-## Screenshots
+## See it
 
-See [`./docs/screenshots/`](./docs/screenshots/) for the full set.
+A full pass through the shell — boot, dashboard, chat surface, agent workspace, autonomy dials, fast-verify gates, org chart, runtime console. Captured from a fresh first run rendering the bundled synthetic demo data: no provider key, no real data.
 
-|                        |                                                   |
-| ---------------------- | ------------------------------------------------- |
-| Boot sequence          | ![boot](./docs/screenshots/00-boot.png)           |
-| Dashboard / agent grid | ![dashboard](./docs/screenshots/01-dashboard.png) |
-| Chat                   | ![chat](./docs/screenshots/02-chat.png)           |
-| Org chart              | ![org](./docs/screenshots/03-org-chart.png)       |
-| Autonomy dials         | ![autonomy](./docs/screenshots/04-autonomy.png)   |
-| Fast-verify gates      | ![gates](./docs/screenshots/05-gates.png)         |
-| Agent workspace        | ![agents](./docs/screenshots/06-agents.png)       |
-| Runtime console        | ![runtime](./docs/screenshots/07-runtime.png)     |
+![SERVARI OS demo: boot, dashboard, chat, agent workspace, autonomy dials, fast-verify gates, org chart, runtime console](./docs/screenshots/servari-demo.gif)
+
+|                                                             |                                                |
+| ----------------------------------------------------------- | ---------------------------------------------- |
+| Chat surface (`/shell/chat`)                                | ![chat](./docs/screenshots/demo-03-chat.png)   |
+| Fast-verify gates — high-risk work parks for human approval | ![gates](./docs/screenshots/demo-06-gates.png) |
+
+The current full set of stills lives in [`./docs/screenshots/`](./docs/screenshots/) as `demo-*.png`.
 
 ---
 
