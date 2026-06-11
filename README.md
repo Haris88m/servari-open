@@ -8,6 +8,7 @@
 [![Last commit](https://img.shields.io/github/last-commit/Haris88m/servari-open)](https://github.com/Haris88m/servari-open/commits)
 ![BYOM](https://img.shields.io/badge/BYOM-OpenAI--compatible-lightgrey)
 ![Local-first](https://img.shields.io/badge/local--first-127.0.0.1-lightgrey)
+[![Built with Claude](https://img.shields.io/badge/built%20with-Claude%20(Anthropic)-d97757)](https://claude.com/claude-code)
 
 ### An AI operator you can actually trust.
 
@@ -322,6 +323,12 @@ To wire your own data, edit the files in `demo-data/` or point `SERVARI_HOME` at
 ## License
 
 Source code is licensed under [Apache License 2.0](./LICENSE) © The SERVARI OS Project. See [NOTICE](./NOTICE) and [docs/LICENSE_MATRIX.md](./docs/LICENSE_MATRIX.md) for third-party attribution and license boundaries.
+
+---
+
+## Built with Claude
+
+SERVARI OS was engineered by Haris Mekic (MEKreflect) and built end-to-end with [Claude](https://claude.com/claude-code) (Anthropic) — Claude Code as the engineering agent, working under a human-gated, verification-first workflow: the same operator discipline SERVARI itself enforces. The architecture, the L0–L5 autonomy policy, and the consume-first design are the author's; Claude wrote, tested, and mechanically verified the code under that direction (`scripts/verify_all.py`, 160-test suite, CI).
 
 ---
 
