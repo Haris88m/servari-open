@@ -86,7 +86,7 @@ failing step prints why).
   stale listener it finds on those ports at startup, and falls back to an
   OS-assigned free port if one cannot be cleared, so a previous crashed run never
   blocks it.
-- The bundled interpreter is a thin launcher that re-execs the real interpreter
-  as a child process; teardown therefore kills the whole process tree (and any
-  leftover listener on the test port) rather than just the launched PID.
+- Some Python launchers re-exec the real interpreter as a child process;
+  teardown therefore kills the whole process tree (and any leftover listener
+  on the test port) rather than just the launched PID.
 - No real provider key is needed — the mock is keyless.
