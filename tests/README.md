@@ -1,8 +1,38 @@
 # SERVARI tests
 
-Regression tests for the SERVARI server. Stdlib-only Python — no test framework,
-no dependencies to install. Each test is a self-contained script that starts the
-real server, drives it over HTTP, asserts behaviour, and tears everything down.
+Regression tests for the SERVARI server, in two layers:
+
+1. **`test_*.py` — the pytest unit suite** for the server core modules
+   (autonomy, verify_queue, retention, health, chat_byom, the action
+   allow-list). Stdlib + pytest only; no network, no real API keys; every test
+   runs against an isolated temp data home (`SERVARI_HOME`), so the repo's own
+   `demo-data/` and `config.json` are never touched.
+2. **`byom_smoke.py` — the stdlib-only end-to-end smoke test** that boots the
+   real server and drives it over HTTP (no pytest needed).
+
+## Run the pytest suite
+
+From the repo root (install once with `python -m pip install pytest`):
+
+```
+python -m pytest tests/ -q
+```
+
+What it covers, at minimum:
+
+- **autonomy hard gate** — high-risk scores (>16) queue for a human at EVERY
+  level, even L5 full-auto; invalid scores fail closed to queue.
+- **verify queue** — the gate-queue audit is append-only (prior bytes are a
+  byte-prefix of the file after every decision); pending resolves by replay;
+  double-decide never re-decides.
+- **retention** — KEEP on improvement/tie, REVERT with byte-exact restore on
+  degradation, fail-closed REVERT when a metric cannot run, decide-once.
+- **health** — fail-closed verdict (unproven != OK), a pending gate is workflow
+  state (never flips the verdict red), CLI exits 0 and reports in the body.
+- **BYOM honesty** — missing/broken config produces an honest "configure your
+  model" reply (never fabricated, never a crash, never a network call); model
+  failures surface as captured errors with empty text.
+- **action runner** — the allow-list is closed; unknown actions are refused.
 
 ## byom_smoke.py — bring-your-own-model end-to-end smoke test
 
@@ -31,6 +61,8 @@ What it does:
    processes and no leftover listening sockets.
 
 ### Run it
+
+(Excluded from pytest collection by name on purpose — run it directly.)
 
 From the repo root, with any Python 3.10+ on your PATH:
 
