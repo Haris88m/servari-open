@@ -1,0 +1,486 @@
+{
+  "_doc": "Org chart for the consumed ECC agent fleet (/api/org).",
+  "_meta": {
+    "source": "ECC",
+    "source_repo": "https://github.com/affaan-m/ECC",
+    "source_license": "MIT",
+    "consumed_at": "2026-06-12",
+    "converter": "tools/consume_ecc.py",
+    "count": 64
+  },
+  "org_chart": [
+    {
+      "name": "Operator",
+      "role": "Operator",
+      "reports_to": null,
+      "is_human": true,
+      "manages": [
+        "Orchestrator"
+      ]
+    },
+    {
+      "name": "Orchestrator",
+      "role": "Orchestrator",
+      "reports_to": "Operator",
+      "manages": [
+        "a11y-architect",
+        "architect",
+        "build-error-resolver",
+        "chief-of-staff",
+        "code-architect",
+        "code-explorer",
+        "code-reviewer",
+        "code-simplifier",
+        "comment-analyzer",
+        "conversation-analyzer",
+        "cpp-build-resolver",
+        "cpp-reviewer",
+        "csharp-reviewer",
+        "dart-build-resolver",
+        "database-reviewer",
+        "django-build-resolver",
+        "django-reviewer",
+        "doc-updater",
+        "docs-lookup",
+        "e2e-runner",
+        "fastapi-reviewer",
+        "flutter-reviewer",
+        "fsharp-reviewer",
+        "gan-evaluator",
+        "gan-generator",
+        "gan-planner",
+        "go-build-resolver",
+        "go-reviewer",
+        "harmonyos-app-resolver",
+        "harness-optimizer",
+        "healthcare-reviewer",
+        "homelab-architect",
+        "java-build-resolver",
+        "java-reviewer",
+        "kotlin-build-resolver",
+        "kotlin-reviewer",
+        "loop-operator",
+        "marketing-agent",
+        "mle-reviewer",
+        "network-architect",
+        "network-config-reviewer",
+        "network-troubleshooter",
+        "opensource-forker",
+        "opensource-packager",
+        "opensource-sanitizer",
+        "performance-optimizer",
+        "php-reviewer",
+        "planner",
+        "pr-test-analyzer",
+        "python-reviewer",
+        "pytorch-build-resolver",
+        "react-build-resolver",
+        "react-reviewer",
+        "refactor-cleaner",
+        "rust-build-resolver",
+        "rust-reviewer",
+        "security-reviewer",
+        "seo-specialist",
+        "silent-failure-hunter",
+        "swift-build-resolver",
+        "swift-reviewer",
+        "tdd-guide",
+        "type-design-analyzer",
+        "typescript-reviewer"
+      ]
+    },
+    {
+      "name": "a11y-architect",
+      "role": "A11y Architect",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "architect",
+      "role": "Architect",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "build-error-resolver",
+      "role": "Build Error Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "chief-of-staff",
+      "role": "Chief Of Staff",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "code-architect",
+      "role": "Code Architect",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "code-explorer",
+      "role": "Code Explorer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "code-reviewer",
+      "role": "Code Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "code-simplifier",
+      "role": "Code Simplifier",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "comment-analyzer",
+      "role": "Comment Analyzer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "conversation-analyzer",
+      "role": "Conversation Analyzer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "cpp-build-resolver",
+      "role": "Cpp Build Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "cpp-reviewer",
+      "role": "Cpp Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "csharp-reviewer",
+      "role": "Csharp Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "dart-build-resolver",
+      "role": "Dart Build Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "database-reviewer",
+      "role": "Database Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "django-build-resolver",
+      "role": "Django Build Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "django-reviewer",
+      "role": "Django Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "doc-updater",
+      "role": "Doc Updater",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "docs-lookup",
+      "role": "Docs Lookup",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "e2e-runner",
+      "role": "E2e Runner",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "fastapi-reviewer",
+      "role": "Fastapi Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "flutter-reviewer",
+      "role": "Flutter Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "fsharp-reviewer",
+      "role": "Fsharp Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "gan-evaluator",
+      "role": "Gan Evaluator",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "gan-generator",
+      "role": "Gan Generator",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "gan-planner",
+      "role": "Gan Planner",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "go-build-resolver",
+      "role": "Go Build Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "go-reviewer",
+      "role": "Go Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "harmonyos-app-resolver",
+      "role": "Harmonyos App Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "harness-optimizer",
+      "role": "Harness Optimizer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "healthcare-reviewer",
+      "role": "Healthcare Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "homelab-architect",
+      "role": "Homelab Architect",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "java-build-resolver",
+      "role": "Java Build Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "java-reviewer",
+      "role": "Java Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "kotlin-build-resolver",
+      "role": "Kotlin Build Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "kotlin-reviewer",
+      "role": "Kotlin Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "loop-operator",
+      "role": "Loop Operator",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "marketing-agent",
+      "role": "Marketing Agent",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "mle-reviewer",
+      "role": "Mle Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "network-architect",
+      "role": "Network Architect",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "network-config-reviewer",
+      "role": "Network Config Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "network-troubleshooter",
+      "role": "Network Troubleshooter",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "opensource-forker",
+      "role": "Opensource Forker",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "opensource-packager",
+      "role": "Opensource Packager",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "opensource-sanitizer",
+      "role": "Opensource Sanitizer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "performance-optimizer",
+      "role": "Performance Optimizer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "php-reviewer",
+      "role": "Php Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "planner",
+      "role": "Planner",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "pr-test-analyzer",
+      "role": "Pr Test Analyzer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "python-reviewer",
+      "role": "Python Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "pytorch-build-resolver",
+      "role": "Pytorch Build Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "react-build-resolver",
+      "role": "React Build Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "react-reviewer",
+      "role": "React Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "refactor-cleaner",
+      "role": "Refactor Cleaner",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "rust-build-resolver",
+      "role": "Rust Build Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "rust-reviewer",
+      "role": "Rust Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "security-reviewer",
+      "role": "Security Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "seo-specialist",
+      "role": "Seo Specialist",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "silent-failure-hunter",
+      "role": "Silent Failure Hunter",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "swift-build-resolver",
+      "role": "Swift Build Resolver",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "swift-reviewer",
+      "role": "Swift Reviewer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "tdd-guide",
+      "role": "Tdd Guide",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "type-design-analyzer",
+      "role": "Type Design Analyzer",
+      "reports_to": "Orchestrator"
+    },
+    {
+      "name": "typescript-reviewer",
+      "role": "Typescript Reviewer",
+      "reports_to": "Orchestrator"
+    }
+  ],
+  "comms_matrix": {
+    "Orchestrator": {
+      "talks_to": [
+        "a11y-architect",
+        "architect",
+        "build-error-resolver",
+        "chief-of-staff",
+        "code-architect",
+        "code-explorer",
+        "code-reviewer",
+        "code-simplifier",
+        "comment-analyzer",
+        "conversation-analyzer",
+        "cpp-build-resolver",
+        "cpp-reviewer",
+        "csharp-reviewer",
+        "dart-build-resolver",
+        "database-reviewer",
+        "django-build-resolver",
+        "django-reviewer",
+        "doc-updater",
+        "docs-lookup",
+        "e2e-runner",
+        "fastapi-reviewer",
+        "flutter-reviewer",
+        "fsharp-reviewer",
+        "gan-evaluator",
+        "gan-generator",
+        "gan-planner",
+        "go-build-resolver",
+        "go-reviewer",
+        "harmonyos-app-resolver",
+        "harness-optimizer",
+        "healthcare-reviewer",
+        "homelab-architect",
+        "java-build-resolver",
+        "java-reviewer",
+        "kotlin-build-resolver",
+        "kotlin-reviewer",
+        "loop-operator",
+        "marketing-agent",
+        "mle-reviewer",
+        "network-architect",
+        "network-config-reviewer",
+        "network-troubleshooter",
+        "opensource-forker",
+        "opensource-packager",
+        "opensource-sanitizer",
+        "performance-optimizer",
+        "php-reviewer",
+        "planner",
+        "pr-test-analyzer",
+        "python-reviewer",
+        "pytorch-build-resolver",
+        "react-build-resolver",
+        "react-reviewer",
+        "refactor-cleaner",
+        "rust-build-resolver",
+        "rust-reviewer",
+        "security-reviewer",
+        "seo-specialist",
+        "silent-failure-hunter",
+        "swift-build-resolver",
+        "swift-reviewer",
+        "tdd-guide",
+        "type-design-analyzer",
+        "typescript-reviewer"
+      ]
+    }
+  },
+  "reporting_chain": {
+    "rule": "The Operator speaks to the Orchestrator; the Orchestrator runs the consumed fleet."
+  }
+}
