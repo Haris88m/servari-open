@@ -7,7 +7,10 @@
   "scripts": {
     "start": "electron .",
     "build:exe": "electron-builder --config.compression=store",
-    "test": "playwright test tests/servari-qa.spec.js"
+    "test": "playwright test tests/servari-qa.spec.js",
+    "test:py": "python tests/byom_smoke.py && python tests/test_engine_executor.py && python tests/test_security_guard.py",
+    "test:engine": "python tests/test_engine_executor.py",
+    "test:security": "python tests/test_security_guard.py"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.0",

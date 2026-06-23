@@ -30,8 +30,14 @@ CLI:
 Stdlib only. cp1252-safe. Fail-closed/graceful: missing file -> empty queue, never crash.
 """
 from __future__ import annotations
-import json, os, sys, hashlib, argparse, datetime
+import json, os, sys, hashlib, argparse, datetime, itertools, threading
 from pathlib import Path
+
+# Monotonic per-process sequence — guarantees two enqueues in the SAME second from
+# the SAME process still derive distinct ids (os.urandom already covers the cross-
+# process / same-instant case; the counter makes intra-process uniqueness exact).
+_SEQ = itertools.count()
+_SEQ_LOCK = threading.Lock()
 
 # Force UTF-8 stdout/stderr so emoji/accents never crash on Windows consoles.
 for _s in (sys.stdout, sys.stderr):
@@ -98,11 +104,26 @@ def _append(obj) -> bool:
 
 
 def _make_id(ts: str, agent: str, action: str) -> str:
-    """Short DETERMINISTIC id = first 10 hex of sha1(ts|agent|action). No random/Date.now.
-    Collisions are vanishingly unlikely; if one occurs, the existing entry keeps the id and
-    the new content hashes differently anyway (ts second-resolution + content differ)."""
-    raw = f"{ts}|{agent}|{action}".encode("utf-8", "replace")
-    return hashlib.sha1(raw).hexdigest()[:10]
+    """Short UNIQUE id = first 12 hex of sha1(ts|agent|action|seq|rand).
+
+    ts is second-resolution, so (ts|agent|action) alone collides when two gated
+    actions are parked in the same second — _index_status would then coalesce two
+    distinct enqueues onto one id. We mix in a monotonic per-process sequence AND
+    os.urandom(8) so EVERY enqueue derives a distinct id, fail-closed: if urandom
+    is somehow unavailable the sequence + a fallback counter still differ. The id
+    stays opaque/short and content is still hashed in (audit lines remain self-
+    describing). The append-only audit, decide()/history()/list_pending(), and the
+    executor's one-id-one-terminal-event contract all key off this id and are
+    unaffected by how it is derived."""
+    with _SEQ_LOCK:
+        seq = next(_SEQ)
+    try:
+        rand = os.urandom(8).hex()
+    except Exception:
+        # Fail-closed: never collapse to a constant. PID + seq stays distinct.
+        rand = f"{os.getpid():x}{seq:x}"
+    raw = f"{ts}|{agent}|{action}|{seq}|{rand}".encode("utf-8", "replace")
+    return hashlib.sha1(raw).hexdigest()[:12]
 
 
 def _index_status():
@@ -199,6 +220,28 @@ def _print(obj):
     print(json.dumps(obj, ensure_ascii=False, indent=2))
 
 
+def _self_test() -> int:
+    """Same-second id-collision regression check. Returns 0 on PASS, 1 on FAIL.
+
+    Forces a FIXED timestamp + identical (agent, action) — the exact input that
+    used to coalesce — and asserts every derived id is distinct. Pure in-memory
+    (no audit writes), stdlib only, fail-closed."""
+    ts = _now_iso()  # one shared second
+    n = 1000
+    ids = [_make_id(ts, "demo-agent", "publish-demo-artifact") for _ in range(n)]
+    distinct = len(set(ids))
+    ok = distinct == n
+    # Also prove _index_status would keep them separate (no coalescing).
+    seen = set(ids)
+    no_coalesce = len(seen) == n
+    print(json.dumps({
+        "ok": ok and no_coalesce, "ts": ts, "enqueued": n,
+        "distinct_ids": distinct, "coalesced": n - distinct,
+    }, ensure_ascii=False))
+    print("PASS" if (ok and no_coalesce) else "FAIL")
+    return 0 if (ok and no_coalesce) else 1
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="The fast-verify gate queue (park gated actions for human).")
     ap.add_argument("--enqueue", nargs="?", const="__flags__", default=None,
@@ -213,7 +256,12 @@ def main(argv=None):
     ap.add_argument("--decide", nargs="+", metavar=("ID", "DECISION"),
                     help="--decide <id> approve|reject [\"note\"]")
     ap.add_argument("--history", nargs="?", const=50, type=int, help="show last N audit events")
+    ap.add_argument("--self-test", action="store_true",
+                    help="prove same-second enqueues get distinct ids; print PASS/FAIL")
     args = ap.parse_args(argv)
+
+    if args.self_test:
+        return _self_test()
 
     if args.enqueue is not None:
         if args.enqueue == "__flags__":

@@ -18,7 +18,7 @@ Run: python server/servari_server.py  ->  http://127.0.0.1:8911/
 localhost only. Safe DOM in the SPA (no innerHTML). Stdlib. cp1252-safe.
 """
 from __future__ import annotations
-import json, os, sys, glob, subprocess, datetime, platform, shutil, tempfile, hashlib, socket
+import json, os, sys, glob, subprocess, datetime, platform, shutil, tempfile, hashlib, socket, re
 from typing import Optional
 import threading, time
 from collections import deque
@@ -380,12 +380,12 @@ def _engine_start(body: Optional[dict[str, object]] = None) -> dict[str, object]
             }
         stem = py_path.stem.lower()  # filename without extension
         suffix = py_path.suffix.lower()
-        allowed_stems = {"python", "python3", "py"}
-        # also accept versioned names like python3.12 -> stem "python3.12"
-        looks_python = (
-            stem in allowed_stems
-            or stem.startswith("python")
-            or (stem == "py")
+        # EXACT allow-list, not a prefix: 'py', 'python', 'python3', or a
+        # versioned 'python3.12'. The old startswith('python') admitted names
+        # like 'python_payload', so an attacker-dropped binary with that stem
+        # passed the name check. Anchor with fullmatch instead.
+        looks_python = bool(
+            re.fullmatch(r"py|python(3(\.\d+)?)?", stem)
         )
         allowed_suffix = suffix in {"", ".exe"}
         if not (looks_python and allowed_suffix):
@@ -395,6 +395,37 @@ def _engine_start(body: Optional[dict[str, object]] = None) -> dict[str, object]
                 "message": (
                     f"refused non-python interpreter: {py!r} "
                     "(must be sys.executable or a python/python3/py binary)"
+                ),
+                "config": cfg,
+                "status": _engine_live_state(),
+            }
+        # Name is necessary but NOT sufficient — a non-python binary can be
+        # renamed 'python.exe'. Actually RUN it with --version and require the
+        # output to identify as Python before we ever spawn it as the engine
+        # interpreter. Fail-closed on timeout / non-python / any error.
+        try:
+            probe = subprocess.run(
+                [py, "--version"],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                timeout=5, text=True,
+            )
+            probe_out = (probe.stdout or "").strip()
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": "engine_input_rejected",
+                "message": f"could not verify Python interpreter {py!r}: "
+                           f"{type(e).__name__}: {e}",
+                "config": cfg,
+                "status": _engine_live_state(),
+            }
+        if probe.returncode != 0 or not re.match(r"Python\s+3", probe_out):
+            return {
+                "ok": False,
+                "error": "engine_input_rejected",
+                "message": (
+                    f"refused interpreter {py!r}: '--version' did not identify "
+                    f"as Python 3 (got: {probe_out[:120]!r})"
                 ),
                 "config": cfg,
                 "status": _engine_live_state(),
@@ -2718,7 +2749,11 @@ class H(BaseHTTPRequestHandler):
             host_only = host_hdr
             if host_only.startswith("[") and "]" in host_only:
                 host_only = host_only[: host_only.index("]") + 1]
-            elif ":" in host_only:
+            elif host_only.count(":") == 1:
+                # exactly one colon => host:port; strip the port. Multiple colons
+                # means a bare (un-bracketed) IPv6 literal such as '::1' — leave it
+                # intact so _is_loopback_host can match it, rather than mangling it
+                # into '::' and spuriously rejecting legit IPv6 loopback.
                 host_only = host_only.rsplit(":", 1)[0]
             if not self._is_loopback_host(host_only):
                 return False, "untrusted_origin"
@@ -3146,6 +3181,13 @@ class H(BaseHTTPRequestHandler):
         "/api/jobs",
         "/api/applications",
         "/api/trading-workbench",
+        # voice routes are state-changing (voice-debug appends to disk every hit;
+        # transcribe/speak drive heavy STT/TTS compute + cache I/O) and must pass
+        # the same local-trust chokepoint or a malicious browser page can CSRF
+        # them into disk-fill/log-poisoning and CPU/GPU DoS.
+        "/api/voice-debug",
+        "/api/voice-transcribe",
+        "/api/voice-speak",
     }
 
     def do_POST(self):
@@ -3315,7 +3357,7 @@ class H(BaseHTTPRequestHandler):
                 body = self._body()
                 rec = {
                     "event": str(body.get("event", ""))[:120],
-                    "detail": body.get("detail", ""),
+                    "detail": str(body.get("detail", ""))[:2000],
                     "ts": body.get("ts") or datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds"),
                     "server_ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds"),
                 }

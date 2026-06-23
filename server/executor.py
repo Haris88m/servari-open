@@ -226,12 +226,47 @@ def _append_event(obj: dict) -> bool:
         return False
 
 
-def _executed_ids() -> set:
-    """Set of gate-queue entry ids that already have a terminal event recorded.
-    'executed', 'skipped' and 'error' are all terminal — an entry is processed at
-    most once, so a re-run is a strict no-op for already-seen ids."""
+def _terminal_ids() -> set:
+    """Set of gate-queue entry ids that are TERMINAL for re-processing.
+
+    Only a real execution is terminal: an id is never run again once it has an
+    'executed' line, OR a 'started' claim line (the claim is written BEFORE the
+    action runs, so a lone 'started' means the action was already attempted and
+    must not be retried — this is what makes execution exactly-once even if the
+    process dies between act and the terminal 'executed' record).
+
+    Crucially, 'skipped' and 'error' are NOT terminal here. A 'skipped' is the
+    result of autonomy.decide returning a non-'act' verdict (e.g. the agent was
+    at a low level, or the action was not yet allow-listed) — that decision is
+    not permanent, so when the operator later raises the dial the still-approved
+    entry must be re-evaluated and can finally execute. An 'error' from a
+    transient failure (decide raised, a disk hiccup) likewise must be retryable
+    rather than permanently burned. Re-evaluation is rate-limited elsewhere
+    (see _last_nonterminal) so a permanently-parked entry is not re-logged every
+    tick."""
     return {ev.get("id") for ev in _read_events()
-            if isinstance(ev, dict) and ev.get("id")}
+            if isinstance(ev, dict) and ev.get("id")
+            and ev.get("status") in ("executed", "started")}
+
+
+def _last_nonterminal() -> dict:
+    """Map id -> last recorded (status, reason) for entries whose latest event is
+    a non-terminal 'skipped'/'error'. Used to suppress re-logging an unchanged
+    skip/error every tick: we only append a new non-terminal event when the
+    verdict/reason actually changes."""
+    out: dict = {}
+    for ev in _read_events():
+        if not isinstance(ev, dict):
+            continue
+        eid = ev.get("id")
+        if not eid:
+            continue
+        status = ev.get("status")
+        if status in ("skipped", "error"):
+            out[eid] = (status, ev.get("reason", ""))
+        elif status in ("executed", "started"):
+            out.pop(eid, None)  # later terminal event clears any prior skip/error
+    return out
 
 
 def _approved_entries() -> list:
@@ -250,47 +285,88 @@ def _approved_entries() -> list:
 # the loop
 # ---------------------------------------------------------------------------
 def run_once() -> dict:
-    """Process every approved-but-not-yet-executed gate-queue entry exactly once.
+    """Process the approved gate-queue entries once.
 
-    For each: gate -> risk score -> autonomy.decide(agent, score). Execute only if
-    verdict == 'act' AND the action is allow-listed; else record 'skipped'. Any
-    error is caught and recorded as 'error'. Returns a summary of this tick."""
-    seen = _executed_ids()
+    For each entry that is NOT already terminal (executed/started-claimed):
+    gate -> risk score -> autonomy.decide(agent, score). Execute only if
+    verdict == 'act' AND the action is allow-listed; otherwise record 'skipped'.
+    Any error is caught and recorded as 'error'. 'skipped'/'error' are NOT
+    terminal — the entry is re-evaluated on later ticks (so raising the dial lets
+    a still-approved entry finally run), but a repeated skip/error with the same
+    reason is suppressed to avoid log spam.
+
+    Exactly-once for real executions is enforced by a claim line: we append a
+    'started' record (and verify it persisted) BEFORE invoking the side-effecting
+    action, then append the terminal 'executed' record after. On replay a lone
+    'started' is treated as already-attempted and never re-run, so a crash or a
+    failed terminal-record write can never cause a double execution.
+
+    Always writes a lightweight per-tick heartbeat so liveness can be derived
+    from the tick itself, not only from work product."""
+    terminal = _terminal_ids()
+    prior = _last_nonterminal()
     executed = skipped = errored = 0
 
     for entry in _approved_entries():
         eid = entry.get("id")
-        if not eid or eid in seen:
-            continue  # exactly-once: never reprocess a recorded id
+        if not eid or eid in terminal:
+            continue  # exactly-once: never reprocess an executed/claimed id
 
         action = (entry.get("action") or "").strip()
         agent = (entry.get("agent") or "unknown").strip()
         gate = (entry.get("gate") or "").strip()
         base = {"id": eid, "action": action, "agent": agent, "gate": gate,
                 "ts": _now_iso()}
+
+        def _record_nonterminal(status: str, reason: str, verdict: str) -> bool:
+            """Append a skipped/error event only if it is new or its reason
+            changed since the last recorded non-terminal event for this id.
+            Returns True if a new event was actually written (a repeated,
+            unchanged skip/error is suppressed and returns False)."""
+            if prior.get(eid) == (status, reason):
+                return False  # unchanged — suppress to avoid per-tick log spam
+            _append_event({**base, "verdict": verdict, "status": status,
+                           "ok": False, "out_excerpt": "", "reason": reason})
+            prior[eid] = (status, reason)
+            return True
+
         try:
             score = _gate_to_score(gate)
             verdict_obj = autonomy.decide(agent, score)
             verdict = verdict_obj.get("verdict", "queue")
 
             if verdict != "act":
-                _append_event({**base, "verdict": verdict, "status": "skipped",
-                               "ok": False, "out_excerpt": "",
-                               "reason": f"verdict={verdict} (not 'act'): "
-                                         f"{verdict_obj.get('reason', '')}"})
-                skipped += 1
-                seen.add(eid)
+                if _record_nonterminal(
+                        "skipped",
+                        f"verdict={verdict} (not 'act'): "
+                        f"{verdict_obj.get('reason', '')}",
+                        verdict):
+                    skipped += 1
                 continue
 
             fn = EXECUTOR_ACTIONS.get(action)
             if fn is None:
-                _append_event({**base, "verdict": verdict, "status": "skipped",
-                               "ok": False, "out_excerpt": "",
-                               "reason": f"action '{action}' not in executor "
-                                         f"allow-list"})
-                skipped += 1
-                seen.add(eid)
+                if _record_nonterminal(
+                        "skipped",
+                        f"action '{action}' not in executor allow-list",
+                        verdict):
+                    skipped += 1
                 continue
+
+            # CLAIM before acting: persist a 'started' line first. If it does not
+            # persist, do NOT run the action — the ledger must be able to record
+            # the attempt, else a replay would double-execute. The claim makes the
+            # id terminal for re-processing immediately.
+            if not _append_event({**base, "verdict": verdict,
+                                  "status": "started", "ok": False,
+                                  "out_excerpt": "", "reason": "claim"}):
+                if _record_nonterminal(
+                        "error",
+                        "ledger_write_failed: could not persist 'started' "
+                        "claim; refusing to run action unrecorded", "error"):
+                    errored += 1
+                continue
+            terminal.add(eid)
 
             result = fn() or {}
             out = str(result.get("out", ""))[:500]
@@ -298,14 +374,14 @@ def run_once() -> dict:
                            "ok": bool(result.get("ok")), "out_excerpt": out,
                            "reason": "act+allow-listed"})
             executed += 1
-            seen.add(eid)
 
         except Exception as e:  # fail-closed; never crash the loop
-            _append_event({**base, "verdict": "error", "status": "error",
-                           "ok": False, "out_excerpt": "",
-                           "reason": f"{type(e).__name__}: {e}"})
-            errored += 1
-            seen.add(eid)
+            if _record_nonterminal("error", f"{type(e).__name__}: {e}", "error"):
+                errored += 1
+
+    _append_event({"id": "", "status": "tick", "ts": _now_iso(),
+                   "executed": executed, "skipped": skipped,
+                   "errored": errored})
 
     return {"ok": True, "tick_ts": _now_iso(), "executed": executed,
             "skipped": skipped, "errored": errored}
@@ -331,9 +407,12 @@ def _parse_iso(ts: str):
 
 def state() -> dict:
     """Engine state derived from the append-only log: running reflects LIVENESS —
-    true only if the last recorded tick/event timestamp is within
+    true only if the last recorded event timestamp is within
     _RUNNING_WINDOW_SECONDS of now; a missing/empty/stale log yields running=False.
-    last_tick + the executed/skipped/errored counts come straight from the log."""
+    Liveness comes from the per-tick heartbeat line ({status:'tick'}) that
+    run_once writes EVERY invocation, so an alive engine that has nothing to do
+    still keeps running=True. 'tick' and 'started' lines are ignored for the
+    executed/skipped/errored counts; only real terminal events are counted."""
     events = _read_events()
     executed = sum(1 for e in events
                    if isinstance(e, dict) and e.get("status") == "executed")
@@ -445,6 +524,66 @@ def self_test() -> bool:
         r4 = run_once()
         assert r4["executed"] == 0 and r4["skipped"] == 1, \
             f"unknown-gate entry should be skipped, not executed: {r4}"
+
+        # 6b) 'skipped' is NOT terminal: an entry skipped because the dial was too
+        # low must EXECUTE once the operator raises the agent's level. Enqueue a
+        # safe allow-listed action, drop the agent to L1 (so a read-only score
+        # yields a non-'act' verdict -> skipped), approve, tick -> skipped; then
+        # raise the dial to L5 and tick again -> it finally executes. This is the
+        # exact regression for the 'skipped is terminal' bug.
+        before_exec = state()["executed_count"]
+        eid_lift = verify_queue.enqueue(
+            agent="lift-agent", gate="read-only", action="disk-free",
+            summary="skipped-then-executed after dial raised",
+        )
+        assert eid_lift, "enqueue (6b) returned no id"
+        assert autonomy.set_level("lift-agent", 1).get("ok"), "set L1 failed"
+        verify_queue.decide(eid_lift, "approve", "approved at L1")
+        r_low = run_once()
+        assert r_low["executed"] == 0 and r_low["skipped"] >= 1, \
+            f"entry should be skipped at L1: {r_low}"
+        assert state()["executed_count"] == before_exec, \
+            "nothing should have executed yet at L1"
+        assert autonomy.set_level("lift-agent", 5).get("ok"), "set L5 failed"
+        r_high = run_once()
+        assert r_high["executed"] == 1, \
+            f"after raising dial the still-approved entry must execute: {r_high}"
+        assert state()["executed_count"] == before_exec + 1, \
+            "executed_count must increment after the dial is raised"
+        # and it is now terminal — a further tick is a no-op for this id
+        r_again = run_once()
+        assert r_again["executed"] == 0, \
+            f"executed entry must not re-run: {r_again}"
+
+        # 6c) exactly-once survives a failed terminal-record write: a lone
+        # 'started' claim (no 'executed' line) must be treated as already-attempted
+        # and NEVER re-run on replay. Simulate a crash-after-claim by writing a
+        # bare 'started' line for an approved entry, then asserting run_once does
+        # not execute it.
+        before_claim = state()["executed_count"]
+        eid_claim = verify_queue.enqueue(
+            agent="lift-agent", gate="read-only", action="disk-free",
+            summary="claim-only must not re-run",
+        )
+        verify_queue.decide(eid_claim, "approve", "approved; will pre-claim")
+        _append_event({"id": eid_claim, "action": "disk-free",
+                       "agent": "lift-agent", "gate": "read-only",
+                       "verdict": "act", "status": "started", "ok": False,
+                       "out_excerpt": "", "reason": "claim",
+                       "ts": _now_iso()})
+        r_claim = run_once()
+        assert r_claim["executed"] == 0, \
+            f"a pre-claimed (started) entry must not execute on replay: {r_claim}"
+        assert state()["executed_count"] == before_claim, \
+            "claim-only entry must not change executed_count"
+
+        # 6d) liveness from the heartbeat: an idle tick (no approved-unseen work)
+        # still writes a 'tick' line, so state().running is True right after a tick
+        # even when zero entries were processed.
+        r_idle = run_once()
+        assert r_idle["executed"] == 0, f"idle tick should do no work: {r_idle}"
+        assert state()["running"] is True, \
+            "running must be True immediately after a heartbeat tick"
 
         # 7) liveness: with no recent tick, state().running must be False. The last
         # event was written 'now', so backdate it past the freshness window by

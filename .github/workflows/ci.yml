@@ -28,6 +28,12 @@ jobs:
       - name: BYOM end-to-end smoke test
         run: python tests/byom_smoke.py
 
+      - name: Execution-engine test (executor + engine ASGI)
+        run: python tests/test_engine_executor.py
+
+      - name: Security-guard test (CSRF/rebinding + engine input)
+        run: python tests/test_security_guard.py
+
       - name: Upload verification report
         if: always()
         uses: actions/upload-artifact@v4

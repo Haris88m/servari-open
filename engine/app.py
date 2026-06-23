@@ -31,7 +31,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import tempfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -76,6 +78,51 @@ def _engine_state() -> dict:
 # ---------------------------------------------------------------------------
 _LOOP_STARTED = threading.Event()
 
+# Cross-PROCESS singleton: a threading.Event only de-dupes within ONE process.
+# Under `uvicorn app:app --workers N` (or any process-based reload/worker setup)
+# this module is imported once PER worker, each of which would otherwise start its
+# own loop and tick the SAME engine-executed.jsonl concurrently — two processes
+# can both read the log before either appends and both execute/append for the same
+# id, a real cross-process exactly-once violation. We hold an OS-level exclusive
+# lock on a sentinel file for the lifetime of the process; only the worker that
+# wins the lock runs the loop. Stdlib only (msvcrt on Windows, fcntl elsewhere).
+_SINGLETON_HANDLE = None  # kept alive for process lifetime so the lock persists
+
+
+def _acquire_singleton() -> bool:
+    """Try to become the single ticking process. Returns True iff this process
+    won the OS-level lock. Fail-OPEN to True only when no locking primitive is
+    available AND we're plainly the sole process (best effort); fail-CLOSED to
+    False when another process already holds the lock."""
+    global _SINGLETON_HANDLE
+    lock_path = Path(tempfile.gettempdir()) / "servari-engine-executor.lock"
+    try:
+        fh = open(lock_path, "a+")
+    except Exception:
+        return True  # cannot create a lock file; assume single-process dev run
+    try:
+        if os.name == "nt":
+            import msvcrt
+            try:
+                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            except OSError:
+                fh.close()
+                return False  # another process holds it
+        else:
+            import fcntl
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                fh.close()
+                return False
+    except Exception:
+        # No locking primitive importable — keep the handle (harmless) and allow
+        # this single process to run; multi-worker on such a platform is unsupported.
+        _SINGLETON_HANDLE = fh
+        return True
+    _SINGLETON_HANDLE = fh  # hold the lock for the process lifetime
+    return True
+
 
 def _executor_loop() -> None:
     """Call executor.run_once() forever, ~every _TICK_SECONDS. Fail-closed: any
@@ -90,10 +137,15 @@ def _executor_loop() -> None:
 
 
 def _start_executor_loop() -> None:
-    """Spawn the daemon loop exactly once."""
+    """Spawn the daemon loop exactly once per process, and only in the single
+    process that wins the cross-process OS lock. A losing worker still serves
+    health/state (reading the shared log) but never ticks, so the exactly-once
+    guarantee holds across workers."""
     if _LOOP_STARTED.is_set():
         return
-    _LOOP_STARTED.set()
+    _LOOP_STARTED.set()  # mark attempted regardless, so we never retry per-process
+    if not _acquire_singleton():
+        return  # another process owns the tick loop; this worker is read-only
     t = threading.Thread(target=_executor_loop, name="servari-executor-loop",
                          daemon=True)
     t.start()
