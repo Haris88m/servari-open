@@ -76,7 +76,10 @@ export interface GridPane {
 
 // Safe accessors for GridPane.turns (server sends an array; legacy callers
 // expected a number). Use these everywhere instead of touching pane.turns raw.
-export function paneTurnCount(pane: { turns?: unknown; total?: number }): number {
+export function paneTurnCount(pane: {
+  turns?: unknown;
+  total?: number;
+}): number {
   if (Array.isArray(pane.turns)) return pane.turns.length;
   if (typeof pane.turns === "number") return pane.turns;
   if (typeof pane.total === "number") return pane.total;
@@ -147,7 +150,15 @@ export interface ModelConfigResponse {
     theme?: string;
     has_key?: boolean;
     key_source?: string;
-    cli?: Record<string, { enabled?: boolean; binary?: string; one_shot_args?: string[]; custom_one_shot?: boolean }>;
+    cli?: Record<
+      string,
+      {
+        enabled?: boolean;
+        binary?: string;
+        one_shot_args?: string[];
+        custom_one_shot?: boolean;
+      }
+    >;
     [k: string]: unknown;
   };
   selected_backend: string;
@@ -183,7 +194,6 @@ export interface GatewaysResponse {
   updated_at?: string;
   error?: string;
 }
-
 
 export interface ObsidianVaultResponse {
   ok: boolean;
@@ -239,7 +249,7 @@ export interface AgentMapResponse {
 
 export interface AgentProfileResponse {
   ok: boolean;
-  profile: Partial<AgentMapNode> & { channel?: string } | null;
+  profile: (Partial<AgentMapNode> & { channel?: string }) | null;
   brief?: AgentBriefResponse;
   error?: string;
 }
@@ -514,7 +524,14 @@ export interface ReportsResponse {
 export interface AgentStatusCell {
   id: string;
   display_name: string;
-  status: "live" | "working" | "idle" | "done" | "blocked" | "error" | "not_started";
+  status:
+    | "live"
+    | "working"
+    | "idle"
+    | "done"
+    | "blocked"
+    | "error"
+    | "not_started";
   current_task: string;
   latest_reply: string;
   latest_reply_ts: string | null;
@@ -576,6 +593,12 @@ export interface EngineState {
   config: EngineConfig;
   probe_health?: unknown;
   probe_ready?: unknown;
+  probe_executor?: {
+    running?: boolean;
+    last_tick?: string | number | null;
+    executed_count?: number;
+    skipped_count?: number;
+  } | null;
 }
 
 export interface EngineActionResponse {
@@ -641,8 +664,11 @@ async function readJSON<T>(res: Response, path: string): Promise<T> {
     }
   }
   if (!res.ok) {
-    const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
-    throw new Error(String(record.error || `${path} failed with HTTP ${res.status}`));
+    const record =
+      data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+    throw new Error(
+      String(record.error || `${path} failed with HTTP ${res.status}`),
+    );
   }
   return data as T;
 }
@@ -663,16 +689,20 @@ export interface TradingWorkbenchResponse {
 
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(path, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
+    method: "GET",
+    headers: { Accept: "application/json" },
   });
   return readJSON<T>(res, path);
 }
 
 async function postJSON<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-SERVARI-Client': 'app' },
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-SERVARI-Client": "app",
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return readJSON<T>(res, path);
@@ -684,7 +714,7 @@ function qs(params: Record<string, string | number | undefined>): string {
     if (v === undefined || v === null) continue;
     parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
   }
-  return parts.length ? `?${parts.join('&')}` : '';
+  return parts.length ? `?${parts.join("&")}` : "";
 }
 
 // ---------------------------------------------------------------------------
@@ -694,10 +724,10 @@ function qs(params: Record<string, string | number | undefined>): string {
 export const API = {
   // --- chat / state ---
   state(): Promise<StateResponse> {
-    return getJSON<StateResponse>('/api/state');
+    return getJSON<StateResponse>("/api/state");
   },
   say(text: string): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/say', { text });
+    return postJSON<OkResponse>("/api/say", { text });
   },
   agentSay(name: string, text: string): Promise<OkResponse> {
     return postJSON<OkResponse>(`/api/agent-say${qs({ name })}`, { text });
@@ -708,120 +738,151 @@ export const API = {
 
   // --- the process grid ---
   grid(): Promise<GridResponse> {
-    return getJSON<GridResponse>('/api/grid');
+    return getJSON<GridResponse>("/api/grid");
   },
 
   // --- org / launch / briefs ---
   org(): Promise<OrgResponse> {
-    return getJSON<OrgResponse>('/api/org');
+    return getJSON<OrgResponse>("/api/org");
   },
   launch(): Promise<LaunchResponse> {
-    return getJSON<LaunchResponse>('/api/launch');
+    return getJSON<LaunchResponse>("/api/launch");
   },
   agentBrief(name: string): Promise<AgentBriefResponse> {
     return getJSON<AgentBriefResponse>(`/api/agent-brief${qs({ name })}`);
   },
   saveAgentBrief(name: string, brief: string): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/agent-brief', { name, brief });
+    return postJSON<OkResponse>("/api/agent-brief", { name, brief });
   },
   agentProfile(name: string): Promise<AgentProfileResponse> {
     return getJSON<AgentProfileResponse>(`/api/agent-profile${qs({ name })}`);
   },
   saveAgentProfile(profile: Record<string, unknown>): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/agent-profile', profile);
+    return postJSON<OkResponse>("/api/agent-profile", profile);
   },
   agentMap(): Promise<AgentMapResponse> {
-    return getJSON<AgentMapResponse>('/api/agent-map');
+    return getJSON<AgentMapResponse>("/api/agent-map");
   },
   agentWorkflows(): Promise<AgentWorkflowsResponse> {
-    return getJSON<AgentWorkflowsResponse>('/api/agent-workflows');
+    return getJSON<AgentWorkflowsResponse>("/api/agent-workflows");
   },
   modelConfig(): Promise<ModelConfigResponse> {
-    return getJSON<ModelConfigResponse>('/api/model-config');
+    return getJSON<ModelConfigResponse>("/api/model-config");
   },
-  saveModelConfig(config: Record<string, unknown>): Promise<ModelConfigResponse> {
-    return postJSON<ModelConfigResponse>('/api/model-config', config);
+  saveModelConfig(
+    config: Record<string, unknown>,
+  ): Promise<ModelConfigResponse> {
+    return postJSON<ModelConfigResponse>("/api/model-config", config);
   },
-  setModelSecret(action: 'set' | 'clear', apiKey = ''): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/settings/model-backend/secret', { action, api_key: apiKey });
+  setModelSecret(action: "set" | "clear", apiKey = ""): Promise<OkResponse> {
+    return postJSON<OkResponse>("/api/settings/model-backend/secret", {
+      action,
+      api_key: apiKey,
+    });
   },
   testModelBackend(text?: string, backend?: string): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/settings/model-backend/test', { text, backend });
+    return postJSON<OkResponse>("/api/settings/model-backend/test", {
+      text,
+      backend,
+    });
   },
   gateways(): Promise<GatewaysResponse> {
-    return getJSON<GatewaysResponse>('/api/gateways');
+    return getJSON<GatewaysResponse>("/api/gateways");
   },
-  gatewayAction(gateway: string, action: 'status' | 'start' | 'stop' | 'restart'): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/gateways/action', { gateway, action });
+  gatewayAction(
+    gateway: string,
+    action: "status" | "start" | "stop" | "restart",
+  ): Promise<OkResponse> {
+    return postJSON<OkResponse>("/api/gateways/action", { gateway, action });
   },
-  cliProviderAction(provider: string, action: 'session' | 'login' | 'configure' | 'dashboard' | 'doctor'): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/cli-provider/action', { provider, action });
+  cliProviderAction(
+    provider: string,
+    action: "session" | "login" | "configure" | "dashboard" | "doctor",
+  ): Promise<OkResponse> {
+    return postJSON<OkResponse>("/api/cli-provider/action", {
+      provider,
+      action,
+    });
   },
   obsidianVault(): Promise<ObsidianVaultResponse> {
-    return getJSON<ObsidianVaultResponse>('/api/obsidian-vault');
+    return getJSON<ObsidianVaultResponse>("/api/obsidian-vault");
   },
-  obsidianAction(action: 'status' | 'sync' | 'open-folder' | 'open-obsidian'): Promise<ObsidianVaultResponse> {
-    return postJSON<ObsidianVaultResponse>('/api/obsidian-vault/action', { action });
+  obsidianAction(
+    action: "status" | "sync" | "open-folder" | "open-obsidian",
+  ): Promise<ObsidianVaultResponse> {
+    return postJSON<ObsidianVaultResponse>("/api/obsidian-vault/action", {
+      action,
+    });
   },
   rssFeeds(): Promise<RssFeedsResponse> {
-    return getJSON<RssFeedsResponse>('/api/rss-feeds');
+    return getJSON<RssFeedsResponse>("/api/rss-feeds");
   },
   tradingWorkbench(): Promise<TradingWorkbenchResponse> {
-    return getJSON<TradingWorkbenchResponse>('/api/trading-workbench');
+    return getJSON<TradingWorkbenchResponse>("/api/trading-workbench");
   },
-  saveTradingWorkbench(payload: Partial<TradingWorkbenchResponse>): Promise<TradingWorkbenchResponse> {
-    return postJSON<TradingWorkbenchResponse>('/api/trading-workbench', payload);
+  saveTradingWorkbench(
+    payload: Partial<TradingWorkbenchResponse>,
+  ): Promise<TradingWorkbenchResponse> {
+    return postJSON<TradingWorkbenchResponse>(
+      "/api/trading-workbench",
+      payload,
+    );
   },
   localStores(): Promise<LocalStoresResponse> {
-    return getJSON<LocalStoresResponse>('/api/local-stores');
+    return getJSON<LocalStoresResponse>("/api/local-stores");
   },
 
   // --- autonomy dials ---
   autonomy(): Promise<AutonomyResponse> {
-    return getJSON<AutonomyResponse>('/api/autonomy');
+    return getJSON<AutonomyResponse>("/api/autonomy");
   },
   setAutonomy(agent: string, level: number | string): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/set-autonomy', { agent, level });
+    return postJSON<OkResponse>("/api/set-autonomy", { agent, level });
   },
 
   // --- fast-verify gate queue ---
   verifyQueue(): Promise<VerifyQueueResponse> {
-    return getJSON<VerifyQueueResponse>('/api/verify-queue');
+    return getJSON<VerifyQueueResponse>("/api/verify-queue");
   },
-  verifyDecide(id: string, decision: string, note = ''): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/verify-decision', { id, decision, note });
+  verifyDecide(id: string, decision: string, note = ""): Promise<OkResponse> {
+    return postJSON<OkResponse>("/api/verify-decision", { id, decision, note });
   },
 
   // --- service health ---
   health(): Promise<HealthCheckResponse> {
-    return getJSON<HealthCheckResponse>('/api/health');
+    return getJSON<HealthCheckResponse>("/api/health");
   },
 
   // --- metric-gated retention loop ---
   retention(): Promise<RetentionResponse> {
-    return getJSON<RetentionResponse>('/api/retention');
+    return getJSON<RetentionResponse>("/api/retention");
   },
   retentionDecide(runId: string): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/retention-decide', { run_id: runId });
+    return postJSON<OkResponse>("/api/retention-decide", { run_id: runId });
   },
 
   // --- context pressure + survival pins ---
   context(): Promise<ContextResponse> {
-    return getJSON<ContextResponse>('/api/context');
+    return getJSON<ContextResponse>("/api/context");
   },
-  contextCheckpoint(note = 'via SERVARI shell'): Promise<OkResponse> {
-    return postJSON<OkResponse>('/api/context-checkpoint', { note });
+  contextCheckpoint(note = "via SERVARI shell"): Promise<OkResponse> {
+    return postJSON<OkResponse>("/api/context-checkpoint", { note });
   },
 
   // --- proof-of-work tokens ---
   tokens(): Promise<TokensResponse> {
-    return getJSON<TokensResponse>('/api/tokens');
+    return getJSON<TokensResponse>("/api/tokens");
   },
   tokensSessions(limit = 20): Promise<TokensSessionsResponse> {
-    return getJSON<TokensSessionsResponse>(`/api/tokens-sessions${qs({ limit })}`);
+    return getJSON<TokensSessionsResponse>(
+      `/api/tokens-sessions${qs({ limit })}`,
+    );
   },
-  tokensReport(scope: string, sessionId?: string): Promise<TokensReportResponse> {
-    return postJSON<TokensReportResponse>('/api/tokens-report', {
+  tokensReport(
+    scope: string,
+    sessionId?: string,
+  ): Promise<TokensReportResponse> {
+    return postJSON<TokensReportResponse>("/api/tokens-report", {
       scope,
       session_id: sessionId,
     });
@@ -829,74 +890,87 @@ export const API = {
 
   // --- personal-world endpoints ---
   jobs(): Promise<JobsResponse> {
-    return getJSON<JobsResponse>('/api/jobs');
+    return getJSON<JobsResponse>("/api/jobs");
   },
   saveJobs(payload: JobsResponse): Promise<JobsResponse & OkResponse> {
-    return postJSON<JobsResponse & OkResponse>('/api/jobs', payload);
+    return postJSON<JobsResponse & OkResponse>("/api/jobs", payload);
   },
   applications(): Promise<ApplicationsResponse> {
-    return getJSON<ApplicationsResponse>('/api/applications');
+    return getJSON<ApplicationsResponse>("/api/applications");
   },
-  saveApplications(payload: ApplicationsResponse): Promise<ApplicationsResponse & OkResponse> {
-    return postJSON<ApplicationsResponse & OkResponse>('/api/applications', payload);
+  saveApplications(
+    payload: ApplicationsResponse,
+  ): Promise<ApplicationsResponse & OkResponse> {
+    return postJSON<ApplicationsResponse & OkResponse>(
+      "/api/applications",
+      payload,
+    );
   },
   career(): Promise<CareerProfile> {
-    return getJSON<CareerProfile>('/api/career');
+    return getJSON<CareerProfile>("/api/career");
   },
-  saveCareer(payload: CareerProfile): Promise<{ ok: boolean; profile?: CareerProfile; error?: string }> {
-    return postJSON<{ ok: boolean; profile?: CareerProfile; error?: string }>('/api/career', payload);
+  saveCareer(
+    payload: CareerProfile,
+  ): Promise<{ ok: boolean; profile?: CareerProfile; error?: string }> {
+    return postJSON<{ ok: boolean; profile?: CareerProfile; error?: string }>(
+      "/api/career",
+      payload,
+    );
   },
   inbox(): Promise<InboxResponse> {
-    return getJSON<InboxResponse>('/api/inbox');
+    return getJSON<InboxResponse>("/api/inbox");
   },
   finance(): Promise<FinanceResponse> {
-    return getJSON<FinanceResponse>('/api/finance');
+    return getJSON<FinanceResponse>("/api/finance");
   },
   memorySurface(): Promise<MemorySurfaceResponse> {
-    return getJSON<MemorySurfaceResponse>('/api/memory-surface');
+    return getJSON<MemorySurfaceResponse>("/api/memory-surface");
   },
   reports(): Promise<ReportsResponse> {
-    return getJSON<ReportsResponse>('/api/reports');
+    return getJSON<ReportsResponse>("/api/reports");
   },
 
   // --- orchestration workspace ---
   agentsStatus(): Promise<AgentsStatusResponse> {
-    return getJSON<AgentsStatusResponse>('/api/agents/status');
+    return getJSON<AgentsStatusResponse>("/api/agents/status");
   },
 
   // --- standing-order actions ---
   actions(): Promise<ActionsResponse> {
-    return getJSON<ActionsResponse>('/api/actions');
+    return getJSON<ActionsResponse>("/api/actions");
   },
   run(action: string): Promise<RunResponse> {
     return getJSON<RunResponse>(`/api/run${qs({ action })}`);
   },
   // --- engine lifecycle ---
   engineStatus(): Promise<EngineStatusResponse> {
-    return getJSON<EngineStatusResponse>('/api/engine/status');
+    return getJSON<EngineStatusResponse>("/api/engine/status");
   },
   engineLogs(lines?: number): Promise<EngineLogsResponse> {
     return getJSON<EngineLogsResponse>(`/api/engine/logs${qs({ lines })}`);
   },
   engineStart(config: EngineConfig = {}): Promise<EngineActionResponse> {
-    return postJSON<EngineActionResponse>('/api/engine/start', config);
+    return postJSON<EngineActionResponse>("/api/engine/start", config);
   },
   engineStop(): Promise<EngineActionResponse> {
-    return postJSON<EngineActionResponse>('/api/engine/stop');
+    return postJSON<EngineActionResponse>("/api/engine/stop");
   },
   engineRestart(config: EngineConfig = {}): Promise<EngineActionResponse> {
-    return postJSON<EngineActionResponse>('/api/engine/restart', config);
+    return postJSON<EngineActionResponse>("/api/engine/restart", config);
   },
 
   // --- voice ---
   voiceConfig(): Promise<VoiceConfigResponse> {
-    return getJSON<VoiceConfigResponse>('/api/voice-config');
+    return getJSON<VoiceConfigResponse>("/api/voice-config");
   },
-  async voiceTranscribe(blob: Blob, lang = 'en'): Promise<VoiceTranscribeResponse> {
+  async voiceTranscribe(
+    blob: Blob,
+    lang = "en",
+  ): Promise<VoiceTranscribeResponse> {
     // The server reads RAW audio bytes off the wire (NOT a JSON body).
     const res = await fetch(`/api/voice-transcribe${qs({ language: lang })}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream' },
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
       body: blob,
     });
     return (await res.json()) as VoiceTranscribeResponse;

@@ -7,7 +7,7 @@
 
 **SERVARI OS is an open-source, local-first BYOM agentic OS shell.** It gives operators a controlled workspace for AI agents: chat, agent grid, autonomy dials, human verification queue, fail-closed health, token tracking, and metric-gated retention — all running locally.
 
-SERVARI is the *shell and control plane*: a React desktop/web UI over a small Python standard-library server. The intelligence is your chosen model, wired through an OpenAI-compatible endpoint. The shell is what you see, control, verify, and audit.
+SERVARI is the _shell and control plane_: a React desktop/web UI over a small Python standard-library server. The intelligence is your chosen model, wired through an OpenAI-compatible endpoint. The shell is what you see, control, verify, and audit.
 
 > Accurate public claim: SERVARI is an open-source, local-first BYOM agentic OS shell with mechanical autonomy gates, an append-only human verification queue, file-backed state, fail-closed health surfaces, and a metric-gated retention loop.
 
@@ -32,7 +32,7 @@ This source repository covers the public shell/control-plane scope:
 - selected API routes that return HTTP 200 JSON in smoke verification,
 - secret/provider config patterns gitignored.
 
-The automated proof is `scripts/verify_all.py`. It mechanically verifies 8 checks: autonomy hard gate, invalid-score fail-closed behavior, append-only verify queue, BYOM no-config honesty, retention self-test, action allow-list, server smoke routes, and secret gitignore patterns. UI rendering is verified by source inspection, screenshots, local build, and the CI UI build job; the verification harness does not perform browser automation.
+The automated proof is `scripts/verify_all.py`. It mechanically verifies 9 checks: autonomy hard gate, invalid-score fail-closed behavior, append-only verify queue, BYOM no-config honesty, retention self-test, action allow-list, server smoke routes, secret gitignore patterns, and the executor self-test (exactly-once execution of an approved gate with high-risk gates held). UI rendering is verified by source inspection, screenshots, local build, and the CI UI build job; the verification harness does not perform browser automation.
 
 Run the proof:
 
@@ -43,7 +43,7 @@ python scripts/verify_all.py
 Expected summary:
 
 ```text
-result: PASS (8/8)
+result: PASS (9/9)
 ```
 
 The full machine-readable report is written to `verification/last-run.json`.
@@ -63,7 +63,7 @@ This repo does **not** claim to be:
 - third-party certified,
 - safe to expose to the public internet without an authentication/reverse-proxy layer.
 
-The multi-agent workspace surface is present. A concurrent autonomous execution engine is not claimed as shipped in this repo.
+The multi-agent workspace surface is present, and a single-process allow-listed executor (read-only/diagnostic actions, exactly-once, fail-closed) is shipped. A **concurrent** autonomous multi-agent execution engine (swarm) is not claimed as shipped in this repo.
 
 ---
 
@@ -71,16 +71,16 @@ The multi-agent workspace surface is present. A concurrent autonomous execution 
 
 See [`./docs/screenshots/`](./docs/screenshots/) for the full set.
 
-| | |
-|---|---|
-| Boot sequence | ![boot](./docs/screenshots/00-boot.png) |
+|                        |                                                   |
+| ---------------------- | ------------------------------------------------- |
+| Boot sequence          | ![boot](./docs/screenshots/00-boot.png)           |
 | Dashboard / agent grid | ![dashboard](./docs/screenshots/01-dashboard.png) |
-| Chat | ![chat](./docs/screenshots/02-chat.png) |
-| Org chart | ![org](./docs/screenshots/03-org-chart.png) |
-| Autonomy dials | ![autonomy](./docs/screenshots/04-autonomy.png) |
-| Fast-verify gates | ![gates](./docs/screenshots/05-gates.png) |
-| Agent workspace | ![agents](./docs/screenshots/06-agents.png) |
-| Runtime console | ![runtime](./docs/screenshots/07-runtime.png) |
+| Chat                   | ![chat](./docs/screenshots/02-chat.png)           |
+| Org chart              | ![org](./docs/screenshots/03-org-chart.png)       |
+| Autonomy dials         | ![autonomy](./docs/screenshots/04-autonomy.png)   |
+| Fast-verify gates      | ![gates](./docs/screenshots/05-gates.png)         |
+| Agent workspace        | ![agents](./docs/screenshots/06-agents.png)       |
+| Runtime console        | ![runtime](./docs/screenshots/07-runtime.png)     |
 
 ---
 
@@ -105,6 +105,25 @@ SERVARI ships a bundled runtime-control surface at `/shell/runtime` and exposes 
 - `POST /api/engine/restart`
 
 The `EngineRuntimeView` panel uses these endpoints to manage a local subprocess (start/stop/restart), read status, and stream recent logs. These routes are served by the same Python shell process that serves the UI on the same host.
+
+`POST /api/engine/start` launches `engine/app.py` by default. Before launching it validates the request is loopback-trusted, that the requested host is loopback (`127.0.0.1`/`localhost`/`::1`), and that the interpreter is a real Python (not an arbitrary binary).
+
+### The execution engine (`engine/app.py` + `server/executor.py`)
+
+Starting the engine does real work: it closes the autonomy loop
+`autonomy -> verify_queue(approved) -> execute`. On startup `engine/app.py`
+spawns a daemon thread that calls `executor.run_once()` about every 3 seconds.
+Each tick walks the **approved** gate-queue entries and, for each one not run
+before, executes it **only if** the autonomy verdict is `act` **and** the action
+is in the executor allow-list. The allow-list is read-only / diagnostic only
+(`python-version`, `disk-free`, `workspace-health`, `public-verification`,
+`rss-refresh`); there is **no** deploy / spend / send / publish, and those
+high-risk gate classes also map to the refuse risk band, so they stay parked even
+at L5. Execution is **exactly-once** (executed ids tracked in the append-only
+`demo-data/engine-executed.jsonl`; a re-run is a strict no-op) and **fail-closed**
+(a bad tick is recorded and swallowed; the loop and server never crash). This is a
+**single-process** executor, not a concurrent multi-agent swarm. Verify it with
+`python server/executor.py --self-test` or check V009 in `scripts/verify_all.py`.
 
 ### Runtime behavior for the Windows launcher
 
@@ -214,12 +233,12 @@ servari.cmd cli --backend codex --workspace "C:\\path\\to\\your\\servari-workspa
 
 SERVARI speaks the OpenAI-compatible `/chat/completions` shape. Copy `config.example.json` to `config.json` and set:
 
-| field | what it is | examples |
-|---|---|---|
-| `base_url` | provider API base | OpenAI, OpenRouter, Ollama, LM Studio, vLLM, Together |
-| `model` | model id at that provider | `gpt-4o-mini`, `llama3.1:8b`, provider-specific ids |
-| `api_key` | provider credential if required | empty for keyless local servers |
-| `provider` | your own label | `openai`, `ollama`, `openrouter` |
+| field      | what it is                      | examples                                              |
+| ---------- | ------------------------------- | ----------------------------------------------------- |
+| `base_url` | provider API base               | OpenAI, OpenRouter, Ollama, LM Studio, vLLM, Together |
+| `model`    | model id at that provider       | `gpt-4o-mini`, `llama3.1:8b`, provider-specific ids   |
+| `api_key`  | provider credential if required | empty for keyless local servers                       |
+| `provider` | your own label                  | `openai`, `ollama`, `openrouter`                      |
 
 `config.json` is gitignored. Check `GET /api/byom-status` or run:
 

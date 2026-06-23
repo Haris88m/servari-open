@@ -40,17 +40,18 @@ A single stdlib HTTP server (`servari_server.py`) on `127.0.0.1:8911` that:
 
 Each is a standalone, stdlib-only, importable + CLI-runnable module:
 
-| module | route(s) | what it is |
-|---|---|---|
-| `autonomy.py` | `/api/autonomy`, `/api/set-autonomy` | the per-agent **L0–L5 autonomy dial** — composes an agent's level with a risk score into `act` / `report` / `queue`. Even at L5 a high-risk score always queues. |
-| `verify_queue.py` | `/api/verify-queue`, `/api/verify-decision` | the **fast-verify gate queue** — parks gated actions (deploy / real-send / spend / publish / merge / secret) as an append-only audit; you approve or reject; nothing acts until approved. |
-| `health.py` | `/api/health` | a **fail-closed health surface** — fast file reads only; any unreadable sub-check degrades to UNKNOWN, the whole call never crashes. |
-| `retention.py` | `/api/retention`, `/api/retention-decide` | a **metric-gated KEEP/REVERT loop** — snapshots targets, runs a metric suite, and reverts byte-exact if quality degrades. |
-| `context_policy.py` | `/api/context`, `/api/context-checkpoint` | the **context-pressure policy** — treats the LLM window as RAM, measures pressure, and verifies "survival pins" are on disk before a compaction is safe. |
-| `tokens.py` | `/api/tokens`, `/api/tokens-sessions`, `/api/tokens-report` | a **proof-of-work token tracker** — reads a usage log and prices it at configurable per-million rates. |
-| `chat_byom.py` | (via `/api/say`, `/api/byom-status`) | the **BYOM chat backend** — reads `config.json`, calls your model's OpenAI-compatible endpoint, returns the reply. |
-| `voice.py` / `voice_neural.py` | `/api/voice-*` | optional **local STT + neural TTS** skeletons (faster-whisper + Piper). Load lazily in a background thread; the port binds first. |
-| `providers/*.py` | `/api/jobs`, `/api/applications`, `/api/career`, `/api/inbox`, `/api/finance`, `/api/memory-surface`, `/api/reports` | the **personal-world panels** — each a fail-closed reader over a `demo-data/` file. |
+| module                          | route(s)                                                                                                             | what it is                                                                                                                                                                                                                                             |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `autonomy.py`                   | `/api/autonomy`, `/api/set-autonomy`                                                                                 | the per-agent **L0–L5 autonomy dial** — composes an agent's level with a risk score into `act` / `report` / `queue`. Even at L5 a high-risk score always queues.                                                                                       |
+| `verify_queue.py`               | `/api/verify-queue`, `/api/verify-decision`                                                                          | the **fast-verify gate queue** — parks gated actions (deploy / real-send / spend / publish / merge / secret) as an append-only audit; you approve or reject; nothing acts until approved.                                                              |
+| `executor.py` + `engine/app.py` | `/api/engine/*` (`engine/app.py` serves `/api/health`, `/api/ready`, `/api/engine-state`)                            | the **single-process executor** — closes `autonomy -> verify_queue(approved) -> execute`; runs approved gates **exactly-once**, fail-closed, allow-listed (read-only/diagnostic only); high-risk gates stay queued even at L5. Not a concurrent swarm. |
+| `health.py`                     | `/api/health`                                                                                                        | a **fail-closed health surface** — fast file reads only; any unreadable sub-check degrades to UNKNOWN, the whole call never crashes.                                                                                                                   |
+| `retention.py`                  | `/api/retention`, `/api/retention-decide`                                                                            | a **metric-gated KEEP/REVERT loop** — snapshots targets, runs a metric suite, and reverts byte-exact if quality degrades.                                                                                                                              |
+| `context_policy.py`             | `/api/context`, `/api/context-checkpoint`                                                                            | the **context-pressure policy** — treats the LLM window as RAM, measures pressure, and verifies "survival pins" are on disk before a compaction is safe.                                                                                               |
+| `tokens.py`                     | `/api/tokens`, `/api/tokens-sessions`, `/api/tokens-report`                                                          | a **proof-of-work token tracker** — reads a usage log and prices it at configurable per-million rates.                                                                                                                                                 |
+| `chat_byom.py`                  | (via `/api/say`, `/api/byom-status`)                                                                                 | the **BYOM chat backend** — reads `config.json`, calls your model's OpenAI-compatible endpoint, returns the reply.                                                                                                                                     |
+| `voice.py` / `voice_neural.py`  | `/api/voice-*`                                                                                                       | optional **local STT + neural TTS** skeletons (faster-whisper + Piper). Load lazily in a background thread; the port binds first.                                                                                                                      |
+| `providers/*.py`                | `/api/jobs`, `/api/applications`, `/api/career`, `/api/inbox`, `/api/finance`, `/api/memory-surface`, `/api/reports` | the **personal-world panels** — each a fail-closed reader over a `demo-data/` file.                                                                                                                                                                    |
 
 ### Home resolution
 
@@ -110,6 +111,24 @@ always pass a human gate.**
 
 Together they let an agent move fast on safe work while every consequential action
 stays under your control.
+
+### The executor (closing the loop)
+
+`server/executor.py` is the piece that turns an **approval** into a (safe) action,
+closing the loop `autonomy -> verify_queue(approved) -> execute`. `engine/app.py`
+runs it: `/api/engine/start` launches `engine/app.py` by default, which spawns a
+daemon thread calling `executor.run_once()` about every 3 seconds. Each tick walks
+the **approved** gate-queue entries and, for each one not run before, executes it
+**only if** the autonomy verdict is `act` **and** the action is in the executor
+allow-list — read-only / diagnostic actions only (`python-version`, `disk-free`,
+`workspace-health`, `public-verification`, `rss-refresh`). There is **no** deploy /
+spend / send / publish; those gate classes also map to the refuse risk band, so
+they stay parked even at L5 (defense in depth). Execution is **exactly-once**
+(executed ids tracked in the append-only `demo-data/engine-executed.jsonl`; a
+re-run is a strict no-op) and **fail-closed** (a bad tick is recorded and
+swallowed; the loop and server never crash). It is a **single-process** executor,
+not a concurrent multi-agent swarm. Self-test: `python server/executor.py
+--self-test`; harness check V009 in `scripts/verify_all.py`.
 
 ## Reliability
 

@@ -182,7 +182,9 @@ _GATE_RISK = {
     "merge-to-main": 18,
     "secret": 20,
 }
-_DEFAULT_RISK = 14  # unknown gate -> "ask" band; will not auto-act
+_DEFAULT_RISK = 20  # unknown gate -> HIGH-risk band (same as deploy/spend/etc.):
+#                     a complete second barrier so an unrecognized gate is queued,
+#                     never auto-acted, even if the allow-list were ever widened.
 
 
 def _gate_to_score(gate: str) -> int:
@@ -309,10 +311,29 @@ def run_once() -> dict:
             "skipped": skipped, "errored": errored}
 
 
+# A tick/event older than this many seconds is considered stale -> not running.
+_RUNNING_WINDOW_SECONDS = 15
+
+
+def _parse_iso(ts: str):
+    """Parse an ISO-8601 timestamp (as written by _now_iso) to an aware datetime.
+    Returns None on any malformed/empty value — callers treat None as 'stale'."""
+    if not ts:
+        return None
+    try:
+        dt = datetime.datetime.fromisoformat(ts)
+    except Exception:
+        return None
+    if dt.tzinfo is None:  # treat naive as UTC
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
+
+
 def state() -> dict:
-    """Engine state derived from the append-only log: running is best-effort
-    (the loop is driven by app.py's background thread, so from the core we report
-    whether any tick has been recorded), last_tick + the executed/skipped counts."""
+    """Engine state derived from the append-only log: running reflects LIVENESS —
+    true only if the last recorded tick/event timestamp is within
+    _RUNNING_WINDOW_SECONDS of now; a missing/empty/stale log yields running=False.
+    last_tick + the executed/skipped/errored counts come straight from the log."""
     events = _read_events()
     executed = sum(1 for e in events
                    if isinstance(e, dict) and e.get("status") == "executed")
@@ -325,8 +346,15 @@ def state() -> dict:
         if isinstance(e, dict) and e.get("ts"):
             last_tick = e.get("ts", "")
             break
+
+    running = False
+    last_dt = _parse_iso(last_tick)
+    if last_dt is not None:
+        age = (datetime.datetime.now(datetime.timezone.utc) - last_dt).total_seconds()
+        running = 0 <= age <= _RUNNING_WINDOW_SECONDS
+
     return {
-        "running": True,
+        "running": running,
         "last_tick": last_tick,
         "executed_count": executed,
         "skipped_count": skipped,
@@ -401,6 +429,53 @@ def self_test() -> bool:
         r3 = run_once()
         assert r3["executed"] == 0 and r3["skipped"] == 1, \
             f"hard-gate entry should be skipped, not executed: {r3}"
+
+        # 6) an UNKNOWN/unrecognized gate must ALSO be skipped even when approved:
+        # the gate-score layer defaults unknown gates to the HIGH-risk score, so
+        # autonomy.decide queues rather than acts. The allow-list is not the only
+        # barrier — this proves the second barrier holds for unrecognized gates.
+        eid3 = verify_queue.enqueue(
+            agent="self-test-agent", gate="totally-unknown-gate",
+            action="workspace-health",
+            summary="unknown gate must not auto-execute",
+        )
+        assert eid3 and eid3 not in (eid, eid2), \
+            f"expected a distinct id for step 6: {eid3}"
+        verify_queue.decide(eid3, "approve", "approved but unknown gate")
+        r4 = run_once()
+        assert r4["executed"] == 0 and r4["skipped"] == 1, \
+            f"unknown-gate entry should be skipped, not executed: {r4}"
+
+        # 7) liveness: with no recent tick, state().running must be False. The last
+        # event was written 'now', so backdate it past the freshness window by
+        # appending a fresh event with an old ts, then assert running is False.
+        old_ts = (datetime.datetime.now(datetime.timezone.utc)
+                  - datetime.timedelta(seconds=_RUNNING_WINDOW_SECONDS + 60)
+                  ).isoformat(timespec="seconds")
+        _append_event({"id": "selftest-stale", "action": "", "agent": "",
+                       "gate": "", "verdict": "skipped", "status": "skipped",
+                       "ok": False, "out_excerpt": "", "reason": "stale-tick probe",
+                       "ts": old_ts})
+        st_stale = state()
+        assert st_stale["running"] is False, \
+            f"running must be False when last tick is stale: {st_stale}"
+
+        # 8) liveness: an empty/missing log yields running=False cleanly (no crash).
+        empty_home = tempfile.mkdtemp(prefix="servari-executor-empty-")
+        prev = os.environ.get("SERVARI_HOME")
+        try:
+            (Path(empty_home) / "demo-data").mkdir(parents=True, exist_ok=True)
+            os.environ["SERVARI_HOME"] = empty_home
+            st_empty = state()
+            assert st_empty["running"] is False and st_empty["last_tick"] == "", \
+                f"empty log must yield running=False, last_tick='': {st_empty}"
+        finally:
+            if prev is None:
+                os.environ.pop("SERVARI_HOME", None)
+            else:
+                os.environ["SERVARI_HOME"] = prev
+            os.environ["SERVARI_HOME"] = tmp  # restore the step-1..7 home
+            shutil.rmtree(empty_home, ignore_errors=True)
 
         return True
     except AssertionError as e:

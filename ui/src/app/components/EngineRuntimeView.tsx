@@ -27,13 +27,39 @@ function formatStartedAt(raw: string | null): string {
   });
 }
 
+function formatLastTick(raw: string | number | null | undefined): string {
+  if (raw === null || raw === undefined || raw === "") return "--";
+  let ms: number;
+  if (typeof raw === "number") {
+    // Treat as epoch — seconds if it looks like seconds, else ms.
+    ms = raw < 1e12 ? raw * 1000 : raw;
+  } else {
+    const parsed = Date.parse(raw);
+    if (!Number.isFinite(parsed)) return String(raw);
+    ms = parsed;
+  }
+  const diff = Date.now() - ms;
+  if (!Number.isFinite(diff)) return String(raw);
+  if (diff < 0) return "just now";
+  const secs = Math.round(diff / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  return `${hrs}h ago`;
+}
+
 function parseProbe(value: unknown): { ok: boolean; detail: string } {
   if (!value || typeof value !== "object") {
     return { ok: false, detail: "not checked" };
   }
   const anyValue = value as Record<string, unknown>;
   const ok = anyValue.ok === true;
-  if (ok) return { ok: true, detail: `${anyValue.status_code ?? ""}`.trim() || "ready" };
+  if (ok)
+    return {
+      ok: true,
+      detail: `${anyValue.status_code ?? ""}`.trim() || "ready",
+    };
   const err = anyValue.error || anyValue.detail || "offline";
   return { ok: false, detail: String(err) };
 }
@@ -54,7 +80,10 @@ export function EngineRuntimeView() {
 
   const load = async () => {
     try {
-      const [statusResp, logsResp] = await Promise.all([API.engineStatus(), API.engineLogs(240)]);
+      const [statusResp, logsResp] = await Promise.all([
+        API.engineStatus(),
+        API.engineLogs(240),
+      ]);
       if (statusResp.ok && statusResp.status) {
         setState(statusResp.status);
         setConfig((cur) => ({
@@ -113,13 +142,16 @@ export function EngineRuntimeView() {
     }
     return {
       label: "STOPPED",
-      status: state.started_at ? `last run ${formatStartedAt(state.started_at)}` : "ready for startup",
+      status: state.started_at
+        ? `last run ${formatStartedAt(state.started_at)}`
+        : "ready for startup",
       color: "var(--s-text-secondary)",
     };
   }, [state, hasPid]);
 
   const probeReady = parseProbe(state?.probe_ready);
   const probeHealth = parseProbe(state?.probe_health);
+  const executor = state?.probe_executor ?? null;
 
   const runAction = async (type: "start" | "stop" | "restart") => {
     setMode(type === "stop" ? "stopping" : "starting");
@@ -147,7 +179,10 @@ export function EngineRuntimeView() {
     }
   };
 
-  const handleChange = (field: keyof EngineConfig, value: string | boolean | number) => {
+  const handleChange = (
+    field: keyof EngineConfig,
+    value: string | boolean | number,
+  ) => {
     setConfig((prev) => ({
       ...prev,
       [field]: value,
@@ -168,7 +203,8 @@ export function EngineRuntimeView() {
           className="flex items-start justify-between gap-4 rounded-xl p-4"
           style={{
             border: "1px solid rgba(20, 156, 150, 0.3)",
-            background: "linear-gradient(130deg, rgba(20,156,150,0.12), rgba(15,18,24,0.75))",
+            background:
+              "linear-gradient(130deg, rgba(20,156,150,0.12), rgba(15,18,24,0.75))",
             boxShadow: "var(--s-glow-primary)",
           }}
           initial={{ opacity: 0, y: 6 }}
@@ -187,10 +223,22 @@ export function EngineRuntimeView() {
               <Cpu size={20} style={{ color: "var(--servari-teal)" }} />
             </div>
             <div>
-              <div style={{ color: "var(--servari-ivory)", fontSize: "1.35rem", letterSpacing: "0.06em" }}>
+              <div
+                style={{
+                  color: "var(--servari-ivory)",
+                  fontSize: "1.35rem",
+                  letterSpacing: "0.06em",
+                }}
+              >
                 SERVARI RUNTIME
               </div>
-              <div style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-12)", letterSpacing: "var(--ls-wide)" }}>
+              <div
+                style={{
+                  color: "var(--s-text-secondary)",
+                  fontSize: "var(--t-12)",
+                  letterSpacing: "var(--ls-wide)",
+                }}
+              >
                 managed runtime service, local subprocess control plane
               </div>
             </div>
@@ -217,11 +265,23 @@ export function EngineRuntimeView() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             className="rounded-xl overflow-hidden"
-            style={{ border: "1px solid var(--s-edge-subtle)", background: "var(--s-glass-light)" }}
+            style={{
+              border: "1px solid var(--s-edge-subtle)",
+              background: "var(--s-glass-light)",
+            }}
           >
-            <div className="p-4 border-b" style={{ borderColor: "rgba(250, 248, 243, 0.08)" }}>
+            <div
+              className="p-4 border-b"
+              style={{ borderColor: "rgba(250, 248, 243, 0.08)" }}
+            >
               <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
-                <span style={{ color: "var(--s-text-secondary)", fontFamily: "var(--font-mono)", fontSize: "var(--t-12)" }}>
+                <span
+                  style={{
+                    color: "var(--s-text-secondary)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "var(--t-12)",
+                  }}
+                >
                   CONTROL SURFACE
                 </span>
                 <div
@@ -247,29 +307,61 @@ export function EngineRuntimeView() {
                 </div>
               </div>
 
-              <div className="mt-3 rounded-lg px-3 py-2" style={{ border: "1px solid var(--s-edge-subtle)", background: "var(--s-glass)" }}>
-                <div className="text-xs" style={{ color: "var(--s-text-secondary)" }}>
+              <div
+                className="mt-3 rounded-lg px-3 py-2"
+                style={{
+                  border: "1px solid var(--s-edge-subtle)",
+                  background: "var(--s-glass)",
+                }}
+              >
+                <div
+                  className="text-xs"
+                  style={{ color: "var(--s-text-secondary)" }}
+                >
                   HEALTH SNAPSHOT
                 </div>
-                <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2" style={{ fontSize: "var(--t-11)" }}>
-                  <div className="rounded-lg px-2 py-1.5" style={{ border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-primary)" }}>
-                    <span style={{ color: "var(--s-text-secondary)" }}>READY probe</span>
+                <div
+                  className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2"
+                  style={{ fontSize: "var(--t-11)" }}
+                >
+                  <div
+                    className="rounded-lg px-2 py-1.5"
+                    style={{
+                      border: "1px solid var(--s-edge-subtle)",
+                      color: "var(--s-text-primary)",
+                    }}
+                  >
+                    <span style={{ color: "var(--s-text-secondary)" }}>
+                      READY probe
+                    </span>
                     <span
                       className="float-right"
                       style={{
-                        color: probeReady.ok ? "var(--s-status-ok)" : "var(--s-status-error)",
+                        color: probeReady.ok
+                          ? "var(--s-status-ok)"
+                          : "var(--s-status-error)",
                         fontFamily: "var(--font-mono)",
                       }}
                     >
                       {running ? probeReady.detail : "off"}
                     </span>
                   </div>
-                  <div className="rounded-lg px-2 py-1.5" style={{ border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-primary)" }}>
-                    <span style={{ color: "var(--s-text-secondary)" }}>HEALTH check</span>
+                  <div
+                    className="rounded-lg px-2 py-1.5"
+                    style={{
+                      border: "1px solid var(--s-edge-subtle)",
+                      color: "var(--s-text-primary)",
+                    }}
+                  >
+                    <span style={{ color: "var(--s-text-secondary)" }}>
+                      HEALTH check
+                    </span>
                     <span
                       className="float-right"
                       style={{
-                        color: probeHealth.ok ? "var(--s-status-ok)" : "var(--s-status-error)",
+                        color: probeHealth.ok
+                          ? "var(--s-status-ok)"
+                          : "var(--s-status-error)",
                         fontFamily: "var(--font-mono)",
                       }}
                     >
@@ -279,26 +371,65 @@ export function EngineRuntimeView() {
                   <div style={{ color: "var(--s-text-secondary)" }}>
                     pid / home
                   </div>
-                  <div className="text-right" style={{ color: "var(--s-text-primary)" }}>
-                    {(state?.pid ?? "n/a")} | {cfgHome}
+                  <div
+                    className="text-right"
+                    style={{ color: "var(--s-text-primary)" }}
+                  >
+                    {state?.pid ?? "n/a"} | {cfgHome}
                   </div>
                   <div style={{ color: "var(--s-text-secondary)" }}>
                     endpoint
                   </div>
-                  <div className="text-right" style={{ color: "var(--s-text-primary)" }}>
+                  <div
+                    className="text-right"
+                    style={{ color: "var(--s-text-primary)" }}
+                  >
                     {cfgHost}:{cfgPort}
                   </div>
                   <div style={{ color: "var(--s-text-secondary)" }}>
                     runtime state
                   </div>
-                  <div className="text-right" style={{ color: "var(--s-text-primary)" }}>
+                  <div
+                    className="text-right"
+                    style={{ color: "var(--s-text-primary)" }}
+                  >
                     {stateSummary.status}
                   </div>
                 </div>
+
+                {running && executor && (
+                  <div
+                    className="mt-2 rounded-lg px-2 py-1.5"
+                    style={{
+                      border: "1px solid var(--s-edge-subtle)",
+                      background: "rgba(20, 156, 150, 0.06)",
+                      color: "var(--s-text-primary)",
+                      fontSize: "var(--t-11)",
+                    }}
+                  >
+                    <span style={{ color: "var(--s-text-secondary)" }}>
+                      Executor
+                    </span>
+                    <span
+                      className="float-right"
+                      style={{ fontFamily: "var(--font-mono)" }}
+                    >
+                      {executor.executed_count ?? 0} executed ·{" "}
+                      {executor.skipped_count ?? 0} skipped · last tick{" "}
+                      {formatLastTick(executor.last_tick)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 grid gap-2">
-                <label htmlFor="runtime-home" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-12)" }}>
+                <label
+                  htmlFor="runtime-home"
+                  style={{
+                    color: "var(--s-text-primary)",
+                    fontSize: "var(--t-12)",
+                  }}
+                >
                   Runtime workspace path
                 </label>
                 <input
@@ -317,7 +448,14 @@ export function EngineRuntimeView() {
 
               <div className="mt-3 grid gap-2 grid-cols-1 sm:grid-cols-3">
                 <label className="block">
-                  <span style={{ color: "var(--s-text-primary)", fontSize: "var(--t-12)" }}>Host</span>
+                  <span
+                    style={{
+                      color: "var(--s-text-primary)",
+                      fontSize: "var(--t-12)",
+                    }}
+                  >
+                    Host
+                  </span>
                   <input
                     value={config.host || ""}
                     onChange={(e) => handleChange("host", e.target.value)}
@@ -330,10 +468,19 @@ export function EngineRuntimeView() {
                   />
                 </label>
                 <label className="block">
-                  <span style={{ color: "var(--s-text-primary)", fontSize: "var(--t-12)" }}>Port</span>
+                  <span
+                    style={{
+                      color: "var(--s-text-primary)",
+                      fontSize: "var(--t-12)",
+                    }}
+                  >
+                    Port
+                  </span>
                   <input
                     value={config.port ?? ""}
-                    onChange={(e) => handleChange("port", safePort(e.target.value))}
+                    onChange={(e) =>
+                      handleChange("port", safePort(e.target.value))
+                    }
                     className="mt-1 block w-full rounded-lg px-3 py-2 outline-none"
                     style={{
                       border: "1px solid var(--s-edge-subtle)",
@@ -343,7 +490,14 @@ export function EngineRuntimeView() {
                   />
                 </label>
                 <label className="block">
-                  <span style={{ color: "var(--s-text-primary)", fontSize: "var(--t-12)" }}>Python</span>
+                  <span
+                    style={{
+                      color: "var(--s-text-primary)",
+                      fontSize: "var(--t-12)",
+                    }}
+                  >
+                    Python
+                  </span>
                   <input
                     value={config.python || ""}
                     onChange={(e) => handleChange("python", e.target.value)}
@@ -357,17 +511,25 @@ export function EngineRuntimeView() {
                 </label>
               </div>
 
-              <label className="mt-3 flex items-center gap-2 text-sm" style={{ color: "var(--s-text-secondary)" }}>
+              <label
+                className="mt-3 flex items-center gap-2 text-sm"
+                style={{ color: "var(--s-text-secondary)" }}
+              >
                 <input
                   type="checkbox"
                   checked={!!config.auth_enabled}
-                  onChange={(e) => handleChange("auth_enabled", e.target.checked)}
+                  onChange={(e) =>
+                    handleChange("auth_enabled", e.target.checked)
+                  }
                 />
                 Enforce service auth
               </label>
             </div>
 
-            <div className="p-4 border-t" style={{ borderColor: "rgba(250, 248, 243, 0.08)" }}>
+            <div
+              className="p-4 border-t"
+              style={{ borderColor: "rgba(250, 248, 243, 0.08)" }}
+            >
               <div className="flex flex-wrap gap-2">
                 <motion.button
                   type="button"
@@ -427,8 +589,28 @@ export function EngineRuntimeView() {
                 </motion.button>
               </div>
 
-              {msg && <div style={{ color: "var(--s-status-ok)", fontSize: "var(--t-12)", marginTop: 10 }}>{msg}</div>}
-              {error && <div style={{ color: "var(--s-status-error)", fontSize: "var(--t-12)", marginTop: 10 }}>{error}</div>}
+              {msg && (
+                <div
+                  style={{
+                    color: "var(--s-status-ok)",
+                    fontSize: "var(--t-12)",
+                    marginTop: 10,
+                  }}
+                >
+                  {msg}
+                </div>
+              )}
+              {error && (
+                <div
+                  style={{
+                    color: "var(--s-status-error)",
+                    fontSize: "var(--t-12)",
+                    marginTop: 10,
+                  }}
+                >
+                  {error}
+                </div>
+              )}
             </div>
           </motion.div>
 
@@ -443,7 +625,14 @@ export function EngineRuntimeView() {
               }}
             >
               <div className="flex items-center justify-between">
-                <div className="inline-flex items-center gap-2" style={{ color: "var(--s-text-secondary)", fontFamily: "var(--font-mono)", fontSize: "var(--t-12)" }}>
+                <div
+                  className="inline-flex items-center gap-2"
+                  style={{
+                    color: "var(--s-text-secondary)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "var(--t-12)",
+                  }}
+                >
                   <MapPinned size={14} /> OPS
                 </div>
                 <div className="inline-flex gap-2">
@@ -451,7 +640,11 @@ export function EngineRuntimeView() {
                     type="button"
                     onClick={() => setLogs([])}
                     className="rounded-lg px-2 py-1 text-xs"
-                    style={{ border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-secondary)", background: "rgba(250, 248, 243, 0.04)" }}
+                    style={{
+                      border: "1px solid var(--s-edge-subtle)",
+                      color: "var(--s-text-secondary)",
+                      background: "rgba(250, 248, 243, 0.04)",
+                    }}
                   >
                     <span className="inline-flex items-center gap-1">
                       <X size={12} /> clear
@@ -459,20 +652,39 @@ export function EngineRuntimeView() {
                   </button>
                 </div>
               </div>
-              <p style={{ color: "var(--s-text-primary)", fontSize: "var(--t-12)", marginTop: 10 }}>
-                Runtime operations metadata, local probes, and config notes for one place to tune startup.
+              <p
+                style={{
+                  color: "var(--s-text-primary)",
+                  fontSize: "var(--t-12)",
+                  marginTop: 10,
+                }}
+              >
+                Runtime operations metadata, local probes, and config notes for
+                one place to tune startup.
               </p>
               <ul
                 className="mt-3 space-y-2"
-                style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}
+                style={{
+                  color: "var(--s-text-secondary)",
+                  fontSize: "var(--t-11)",
+                }}
               >
-                <li className="rounded-lg px-2 py-1.5 border" style={{ borderColor: "var(--s-edge-subtle)" }}>
+                <li
+                  className="rounded-lg px-2 py-1.5 border"
+                  style={{ borderColor: "var(--s-edge-subtle)" }}
+                >
                   Host: {cfgHost} | Port: {cfgPort}
                 </li>
-                <li className="rounded-lg px-2 py-1.5 border" style={{ borderColor: "var(--s-edge-subtle)" }}>
+                <li
+                  className="rounded-lg px-2 py-1.5 border"
+                  style={{ borderColor: "var(--s-edge-subtle)" }}
+                >
                   Python: {state?.config?.python || config.python || "default"}
                 </li>
-                <li className="rounded-lg px-2 py-1.5 border" style={{ borderColor: "var(--s-edge-subtle)" }}>
+                <li
+                  className="rounded-lg px-2 py-1.5 border"
+                  style={{ borderColor: "var(--s-edge-subtle)" }}
+                >
                   Auth token: {config.auth_enabled ? "enabled" : "disabled"}
                 </li>
               </ul>
@@ -482,10 +694,23 @@ export function EngineRuntimeView() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               className="rounded-xl overflow-hidden"
-              style={{ border: "1px solid var(--s-edge-subtle)", background: "var(--s-glass)" }}
+              style={{
+                border: "1px solid var(--s-edge-subtle)",
+                background: "var(--s-glass)",
+              }}
             >
-              <div className="px-4 py-3 border-b" style={{ borderColor: "rgba(250, 248, 243, 0.1)" }}>
-                <div className="flex items-center gap-2" style={{ color: "var(--s-text-secondary)", fontFamily: "var(--font-mono)", fontSize: "var(--t-12)" }}>
+              <div
+                className="px-4 py-3 border-b"
+                style={{ borderColor: "rgba(250, 248, 243, 0.1)" }}
+              >
+                <div
+                  className="flex items-center gap-2"
+                  style={{
+                    color: "var(--s-text-secondary)",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "var(--t-12)",
+                  }}
+                >
                   <FileTerminal size={14} /> LIVE LOGS
                 </div>
               </div>
@@ -509,15 +734,31 @@ export function EngineRuntimeView() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               className="rounded-xl p-4"
-              style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(250, 248, 243, 0.02)" }}
+              style={{
+                border: "1px solid var(--s-edge-subtle)",
+                background: "rgba(250, 248, 243, 0.02)",
+              }}
             >
-              <div className="inline-flex items-center gap-2" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-13)" }}>
+              <div
+                className="inline-flex items-center gap-2"
+                style={{
+                  color: "var(--s-text-primary)",
+                  fontSize: "var(--t-13)",
+                }}
+              >
                 <ShieldCheck size={14} />
                 Safety note
               </div>
-              <p style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-12)", marginTop: 6 }}>
-                SERVARI Runtime controls only start local processes under the active Servari home/workspace.
-                Endpoints are served on localhost and are never forwarded to your remote devices.
+              <p
+                style={{
+                  color: "var(--s-text-secondary)",
+                  fontSize: "var(--t-12)",
+                  marginTop: 6,
+                }}
+              >
+                SERVARI Runtime controls only start local processes under the
+                active Servari home/workspace. Endpoints are served on localhost
+                and are never forwarded to your remote devices.
               </p>
             </motion.div>
           </div>

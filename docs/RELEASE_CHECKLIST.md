@@ -20,9 +20,10 @@ Use this checklist before tagging or announcing a public SERVARI release.
 
 ## Verification
 
-- [ ] `python scripts/verify_all.py` passes locally.
+- [ ] `python scripts/verify_all.py` passes locally with `result: PASS (9/9)`.
 - [ ] `python tests/byom_smoke.py` passes locally.
 - [ ] `python server/retention.py --self-test` passes locally.
+- [ ] `python server/executor.py --self-test` passes locally (prints `PASS`).
 - [ ] The UI builds locally:
   - [ ] `cd ui`
   - [ ] `npm ci`
@@ -55,7 +56,7 @@ Use this checklist before tagging or announcing a public SERVARI release.
 - [ ] README does not claim the repo ships a frontier model.
 - [ ] README does not claim third-party certification.
 - [ ] README does not claim public internet hardening.
-- [ ] README does not claim a shipped concurrent autonomous multi-agent execution engine.
+- [ ] README does not claim a shipped concurrent autonomous multi-agent execution engine (the shipped executor is single-process and allow-listed only).
 - [ ] Roadmap items are labelled as roadmap, partial, or not shipped.
 - [ ] Claim register statuses match the current code and tests.
 
@@ -67,6 +68,7 @@ Use this checklist before tagging or announcing a public SERVARI release.
 - [ ] High-risk autonomy still queues at L5.
 - [ ] Verify queue writes pending and decision events append-only.
 - [ ] Retention self-test covers KEEP, REVERT, byte-exact restore, and double-decide rejection.
+- [ ] Executor runs approved gates exactly-once and holds high-risk gates (deploy/spend/send/publish) even at L5; only the read-only/diagnostic allow-list is executable.
 
 ## Release actions
 

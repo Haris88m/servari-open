@@ -2939,6 +2939,18 @@ class H(BaseHTTPRequestHandler):
                     base = _engine_base_url(cfg)
                     state["probe_health"] = _engine_status_probe(base, "/api/health")
                     state["probe_ready"] = _engine_status_probe(base, "/api/ready")
+                    # Also probe the executor work surface so the operator can SEE
+                    # the engine doing something. Fail-closed to null on any error
+                    # (the fake fixture engine returns 404 for /api/engine-state).
+                    try:
+                        exec_probe = _engine_status_probe(base, "/api/engine-state")
+                        body = exec_probe.get("body") if isinstance(exec_probe, dict) else None
+                        if isinstance(exec_probe, dict) and exec_probe.get("ok") and isinstance(body, dict):
+                            state["probe_executor"] = body
+                        else:
+                            state["probe_executor"] = None
+                    except Exception:
+                        state["probe_executor"] = None
                 self._send(200, json.dumps({"ok": True, "status": state}))
             except Exception as e:
                 self._send(200, json.dumps({"ok": False, "error": f"engine-status failed: {type(e).__name__}"}))

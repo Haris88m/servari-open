@@ -221,6 +221,25 @@ def check_retention_self_test() -> Dict[str, Any]:
     return result
 
 
+def check_executor_self_test() -> Dict[str, Any]:
+    with _env(SERVARI_HOME=str(TEST_HOME)):
+        # Reload verify_queue + autonomy first so the executor binds to the
+        # isolated TEST_HOME rather than any stale module state, then reload the
+        # executor itself. executor.self_test() runs its own isolated temp home,
+        # asserting: a fresh approved gate executes exactly once, a second run is
+        # a strict no-op, and a high-risk gate (deploy) is skipped not executed.
+        _reload("verify_queue")
+        _reload("autonomy")
+        executor = _reload("executor")
+        ok = executor.self_test()
+    assert ok is True, {"self_test_returned": ok}
+    return {"self_test": "PASS", "asserts": [
+        "fresh approved gate executes exactly once",
+        "second run is a strict no-op (exactly-once)",
+        "high-risk (deploy) gate is skipped, not executed",
+    ]}
+
+
 def check_allow_list_runner() -> Dict[str, Any]:
     with _env(SERVARI_HOME=str(TEST_HOME), SERVARI_PORT=str(TEST_PORT)):
         server = _reload("servari_server")
@@ -458,6 +477,7 @@ def main() -> int:
     runner.check("V006", "action runner is allow-listed", check_allow_list_runner)
     runner.check("V007", "server smoke routes return HTTP 200 JSON", check_server_smoke)
     runner.check("V008", "secret config patterns are gitignored", check_gitignore_secrets)
+    runner.check("V009", "executor self-test: exactly-once + high-risk gate held", check_executor_self_test)
 
     runner.write_report()
     print("===========================")
