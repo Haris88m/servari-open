@@ -1,29 +1,38 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
-import { FileText, Inbox, Play, Loader2, CheckCircle2, XCircle, Terminal } from "lucide-react";
-import { API, AgentBriefResponse, RunResponse } from "../lib/api";
+import {
+  CheckCircle2,
+  ClipboardList,
+  FileText,
+  Loader2,
+  Play,
+  RefreshCw,
+  ShieldCheck,
+  Terminal,
+  XCircle,
+} from "lucide-react";
+import { API, type AgentBriefResponse, type RunResponse, type StandingOrder } from "../lib/api";
 import { sealLabel } from "../lib/display_seal";
 
-// A readable label from a channel key like "agent-1" / "data-export".
 function labelFor(name: string) {
-  return name
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return name.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Action ids ("agent-audit", "git-status") -> a readable, sealed display label.
-// Every label passes the display seal so no internal vocabulary can ever render
-// on the SERVARI face, even if a future action carries one.
-function actionLabel(action: string): string {
-  const human = action.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  return sealLabel(human) || human;
+function fallbackOrder(action: string): StandingOrder {
+  return {
+    id: action,
+    action,
+    title: action.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    purpose: "Local allow-listed SERVARI operation.",
+    owner: "Operator",
+    trigger: "manual",
+    gate: "allow-listed action",
+    enabled: true,
+  };
 }
 
-// One standing-order row + its run state. The run output is real command
-// output (exit code + stdout from /api/run) and is passed through the seal
-// before rendering, so any internal term in raw output is neutralized.
-function OrderCard({ action, index }: { action: string; index: number }) {
+function OrderCard({ order, index, onAfterRun }: { order: StandingOrder; index: number; onAfterRun: () => void }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResponse | null>(null);
   const [open, setOpen] = useState(false);
@@ -33,128 +42,81 @@ function OrderCard({ action, index }: { action: string; index: number }) {
     setResult(null);
     setOpen(true);
     try {
-      const r = await API.run(action);
-      setResult(r);
-    } catch (e) {
-      setResult({ ok: false, action, error: String(e) });
+      const next = await API.run(order.action);
+      setResult(next);
+      onAfterRun();
+    } catch (error) {
+      setResult({ ok: false, action: order.action, error: error instanceof Error ? error.message : String(error) });
     } finally {
       setRunning(false);
     }
-  }, [action]);
+  }, [onAfterRun, order.action]);
 
   const succeeded = result != null && result.ok && (result.exit === 0 || result.exit === undefined);
   const failed = result != null && !succeeded;
-  const label = actionLabel(action);
-  const rawOut = result?.out ?? result?.error ?? "";
-  const sealedOut = rawOut ? sealLabel(rawOut) : "";
+  const output = result?.out ?? result?.error ?? "";
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.04 }}
-      className="rounded-xl overflow-hidden"
-      style={{
-        background: 'var(--servari-glass)',
-        backdropFilter: 'blur(24px)',
-        border: '1px solid rgba(250, 248, 243, 0.08)',
-      }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.035 }}
+      className="overflow-hidden rounded-lg"
+      style={{ background: "var(--s-glass-light)", border: "1px solid var(--s-edge-subtle)" }}
     >
-      <div className="p-4 flex items-center gap-4">
-        {/* Status icon — idle / running / ok / failed */}
-        {running ? (
-          <Loader2 size={20} className="animate-spin" style={{ color: 'var(--servari-teal)', flexShrink: 0 }} />
-        ) : succeeded ? (
-          <CheckCircle2 size={20} style={{ color: 'var(--servari-green)', flexShrink: 0 }} />
-        ) : failed ? (
-          <XCircle size={20} style={{ color: 'var(--servari-red)', flexShrink: 0 }} />
-        ) : (
-          <Terminal size={20} style={{ color: 'var(--servari-dimmed)', flexShrink: 0 }} />
-        )}
-
-        {/* Task details */}
-        <div className="flex-1 min-w-0">
-          <div
-            style={{
-              color: 'var(--servari-ivory)',
-              fontSize: '0.9375rem',
-              marginBottom: '0.25rem',
-            }}
-          >
-            {label}
+      <div className="grid gap-4 p-4 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+        <div className="grid h-10 w-10 place-items-center rounded-lg" style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(250,248,243,0.025)" }}>
+          {running ? <Loader2 size={18} className="animate-spin" style={{ color: "var(--s-text-teal)" }} /> : failed ? <XCircle size={18} style={{ color: "var(--s-status-error)" }} /> : succeeded ? <CheckCircle2 size={18} style={{ color: "var(--s-status-ok)" }} /> : <Terminal size={18} style={{ color: "var(--s-text-secondary)" }} />}
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="truncate" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-16)", fontWeight: 780, letterSpacing: 0 }}>
+              {order.title}
+            </h2>
+            <span className="rounded-full px-2 py-1" style={{ border: "1px solid rgba(63,185,80,0.32)", color: "var(--s-status-ok)", fontSize: "var(--t-10)", fontFamily: "var(--font-mono)", textTransform: "uppercase" }}>
+              {order.enabled ? "enabled" : "disabled"}
+            </span>
           </div>
-          <div
-            style={{
-              color: 'var(--servari-dimmed)',
-              fontSize: '0.8125rem',
-            }}
-          >
-            {running
-              ? 'Running…'
-              : result != null
-                ? `Last run: exit ${result.exit ?? (result.ok ? 0 : '-')}`
-                : 'Ready to run'}
+          <p className="mt-1" style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-12)", lineHeight: 1.55 }}>
+            {order.purpose}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2" style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>
+            <span>Owner: {order.owner}</span>
+            <span>Trigger: {order.trigger}</span>
+            <span>Gate: {order.gate}</span>
+            {order.last_run && <span>Last run: {order.last_run}</span>}
           </div>
         </div>
-
-        {/* Status badge (mirrors the export's active/pending pill) */}
-        <div
-          className="px-3 py-1 rounded-full text-xs uppercase"
-          style={{
-            background: failed ? 'rgba(248, 81, 73, 0.1)' : 'rgba(63, 185, 80, 0.1)',
-            color: failed ? 'var(--servari-red)' : 'var(--servari-green)',
-            border: failed ? '1px solid var(--servari-red)' : '1px solid var(--servari-green)',
-            letterSpacing: '0.5px',
-            flexShrink: 0,
-          }}
-        >
-          {failed ? 'failed' : 'active'}
-        </div>
-
-        {/* Run button */}
         <button
           onClick={run}
-          disabled={running}
-          className="px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs uppercase"
-          style={{
-            background: running ? 'rgba(20, 156, 150, 0.08)' : 'rgba(20, 156, 150, 0.14)',
-            color: 'var(--servari-teal)',
-            border: '1px solid var(--servari-teal)',
-            letterSpacing: '0.5px',
-            flexShrink: 0,
-            cursor: running ? 'default' : 'pointer',
-            opacity: running ? 0.6 : 1,
-          }}
+          disabled={running || !order.enabled}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 disabled:opacity-45"
+          style={{ border: "1px solid rgba(20,156,150,0.45)", color: "var(--s-text-teal)", background: "rgba(20,156,150,0.10)" }}
         >
-          <Play size={13} />
+          <Play size={14} />
           Run
         </button>
       </div>
 
-      {/* Run output — real {exit, out}, sealed before render */}
       <AnimatePresence>
-        {open && (running || sealedOut) && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            style={{ borderTop: '1px solid rgba(250, 248, 243, 0.08)' }}
-          >
+        {open && (running || output) && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ borderTop: "1px solid var(--s-edge-subtle)" }}>
             <pre
               style={{
                 margin: 0,
-                padding: '1rem',
-                maxHeight: '20rem',
-                overflow: 'auto',
-                color: 'var(--servari-dimmed)',
-                fontSize: '0.75rem',
-                lineHeight: '1.6',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                fontFamily: 'var(--font-mono)',
+                padding: "1rem",
+                maxHeight: "22rem",
+                overflow: "auto",
+                color: failed ? "var(--s-status-error)" : "var(--s-text-secondary)",
+                fontSize: "var(--t-12)",
+                lineHeight: 1.6,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                fontFamily: "var(--font-mono)",
+                background: "rgba(5,8,12,0.55)",
               }}
             >
-              {running ? 'running…' : sealedOut}
+              {running ? "running..." : output}
             </pre>
           </motion.div>
         )}
@@ -166,266 +128,123 @@ function OrderCard({ action, index }: { action: string; index: number }) {
 export function StandingOrders() {
   const [searchParams] = useSearchParams();
   const agent = searchParams.get("agent") || "";
-
-  // --- The standing-order actions (real, allow-listed runners) ---
-  const [actions, setActions] = useState<string[] | null>(null);
-  const [actionsError, setActionsError] = useState<string | null>(null);
-
-  // --- Optional per-agent brief panel (?agent=) ---
+  const [orders, setOrders] = useState<StandingOrder[]>([]);
   const [brief, setBrief] = useState<AgentBriefResponse | null>(null);
-  const [briefError, setBriefError] = useState<string | null>(null);
-  const [briefLoading, setBriefLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  // Load the real action list once.
-  useEffect(() => {
-    let alive = true;
-    API.actions()
-      .then((d) => {
-        if (!alive) return;
-        setActions(Array.isArray(d.actions) ? d.actions : []);
-      })
-      .catch((e) => {
-        if (!alive) return;
-        setActionsError(String(e));
-        setActions([]);
-      });
-    return () => {
-      alive = false;
-    };
+  const load = useCallback(async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const actions = await API.actions();
+      const nextOrders = actions.orders?.length ? actions.orders : (actions.actions || []).map(fallbackOrder);
+      setOrders(nextOrders);
+    } catch (error) {
+      setMessage(`Standing orders unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Load the optional agent brief when ?agent= is present.
   useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    let alive = true;
     if (!agent) {
       setBrief(null);
-      setBriefError(null);
       return;
     }
-    let alive = true;
-    setBriefLoading(true);
-    setBriefError(null);
     API.agentBrief(agent)
-      .then((d) => {
-        if (!alive) return;
-        setBrief(d);
-        setBriefLoading(false);
+      .then((next) => {
+        if (alive) setBrief(next);
       })
-      .catch((e) => {
-        if (!alive) return;
-        setBriefError(String(e));
-        setBriefLoading(false);
+      .catch(() => {
+        if (alive) setBrief(null);
       });
     return () => {
       alive = false;
     };
   }, [agent]);
 
+  const stats = useMemo(() => {
+    const ran = orders.filter((order) => order.last_run).length;
+    const ok = orders.filter((order) => order.last_ok === true).length;
+    return { total: orders.length, ran, ok };
+  }, [orders]);
+
   return (
-    <div className="h-full p-8 overflow-auto">
-      <div className="max-w-4xl mx-auto">
-        <div
-          className={agent ? "mb-2" : "mb-8"}
-          style={{
-            color: 'var(--servari-ivory)',
-            fontSize: '1.5rem',
-            letterSpacing: '1px',
-          }}
+    <div className="h-full overflow-auto p-4 md:p-6 xl:p-8">
+      <div className="mx-auto max-w-6xl space-y-4">
+        <motion.header
+          className="flex flex-col gap-3 rounded-lg px-4 py-4 lg:flex-row lg:items-center lg:justify-between"
+          style={{ border: "1px solid var(--s-edge-accent)", background: "var(--s-glass-light)" }}
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
         >
-          STANDING ORDERS
+          <div>
+            <div className="mb-1 flex items-center gap-2" style={{ color: "var(--s-text-teal)", fontSize: "var(--t-11)", letterSpacing: "var(--ls-caps)", textTransform: "uppercase" }}>
+              <ClipboardList size={15} />
+              Standing Orders
+            </div>
+            <h1 style={{ color: "var(--s-text-primary)", fontSize: "var(--t-24)", fontWeight: 780, letterSpacing: 0 }}>
+              Safe recurring operations and local readiness checks
+            </h1>
+          </div>
+          <button type="button" onClick={() => void load()} className="inline-flex h-10 items-center gap-2 rounded-lg px-3" style={{ border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-primary)", background: "rgba(250,248,243,0.035)" }}>
+            <RefreshCw size={15} />
+            Refresh
+          </button>
+        </motion.header>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg p-4" style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(250,248,243,0.025)" }}>
+            <Terminal size={18} style={{ color: "var(--s-text-teal)" }} />
+            <div className="mt-3" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-20)", fontWeight: 780 }}>{stats.total}</div>
+            <div style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-12)" }}>allow-listed orders</div>
+          </div>
+          <div className="rounded-lg p-4" style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(250,248,243,0.025)" }}>
+            <Play size={18} style={{ color: "var(--s-status-warn)" }} />
+            <div className="mt-3" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-20)", fontWeight: 780 }}>{stats.ran}</div>
+            <div style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-12)" }}>run from this workspace</div>
+          </div>
+          <div className="rounded-lg p-4" style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(250,248,243,0.025)" }}>
+            <ShieldCheck size={18} style={{ color: "var(--s-status-ok)" }} />
+            <div className="mt-3" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-20)", fontWeight: 780 }}>{stats.ok}</div>
+            <div style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-12)" }}>last runs clean</div>
+          </div>
         </div>
-        {agent && (
-          <div
-            className="mb-8"
-            style={{ color: 'var(--servari-teal)', fontSize: '0.875rem' }}
-          >
-            {sealLabel(labelFor(agent)) || labelFor(agent)}
-          </div>
-        )}
 
-        {/* ---- Optional agent-brief panel (only when ?agent= is set) ---- */}
-        {agent && briefLoading && (
-          <div
-            className="p-6 rounded-xl mb-8"
-            style={{
-              background: 'var(--servari-glass)',
-              border: '1px solid rgba(250, 248, 243, 0.08)',
-              color: 'var(--servari-dimmed)',
-              fontSize: '0.875rem',
-            }}
-          >
-            Loading standing orders for {sealLabel(labelFor(agent)) || labelFor(agent)}…
-          </div>
-        )}
-
-        {agent && !briefLoading && briefError && (
-          <div
-            className="p-6 rounded-xl mb-8"
-            style={{
-              background: 'var(--servari-glass)',
-              border: '1px solid rgba(248, 81, 73, 0.2)',
-              color: 'var(--servari-dimmed)',
-              fontSize: '0.8125rem',
-            }}
-          >
-            Brief unavailable: {briefError}
-          </div>
-        )}
-
-        {agent && !briefLoading && !briefError && brief && brief.found && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-6 rounded-xl mb-8"
-            style={{
-              background: 'var(--servari-glass)',
-              backdropFilter: 'blur(24px)',
-              border: '1px solid rgba(250, 248, 243, 0.08)',
-            }}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <FileText size={20} style={{ color: 'var(--servari-teal)', flexShrink: 0 }} />
-              <div style={{ color: 'var(--servari-ivory)', fontSize: '1rem', fontWeight: 500 }}>
-                Agent brief
-              </div>
+        {agent && brief && (
+          <section className="rounded-lg p-4" style={{ border: "1px solid var(--s-edge-subtle)", background: "var(--s-glass-light)" }}>
+            <div className="mb-3 flex items-center gap-2" style={{ color: "var(--s-text-primary)", fontWeight: 750 }}>
+              <FileText size={16} style={{ color: "var(--s-text-teal)" }} />
+              {sealLabel(labelFor(agent)) || labelFor(agent)}
             </div>
-            <pre
-              style={{
-                color: 'var(--servari-ivory)',
-                fontSize: '0.8125rem',
-                lineHeight: '1.6',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                fontFamily: 'var(--font-mono)',
-                margin: 0,
-              }}
-            >
-              {sealLabel(brief.brief)}
+            <pre style={{ margin: 0, maxHeight: 260, overflow: "auto", color: "var(--s-text-secondary)", fontSize: "var(--t-12)", lineHeight: 1.6, whiteSpace: "pre-wrap", fontFamily: "var(--font-mono)" }}>
+              {brief.found ? sealLabel(brief.brief) : "No START.md found for this profile."}
             </pre>
-            {brief.path && (
-              <div
-                className="mt-4 pt-4"
-                style={{
-                  borderTop: '1px solid rgba(250, 248, 243, 0.08)',
-                  color: 'var(--servari-dimmed)',
-                  fontSize: '0.75rem',
-                }}
-              >
-                {brief.path}
-              </div>
-            )}
-          </motion.div>
+          </section>
         )}
 
-        {agent && !briefLoading && !briefError && brief && !brief.found && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-6 rounded-xl mb-8"
-            style={{
-              background: 'var(--servari-glass)',
-              backdropFilter: 'blur(24px)',
-              border: '1px solid rgba(250, 248, 243, 0.08)',
-              color: 'var(--servari-dimmed)',
-              fontSize: '0.875rem',
-              lineHeight: '1.6',
-            }}
-          >
-            {sealLabel((brief as { note?: string }).note || "") ||
-              `No standing orders written yet for ${sealLabel(labelFor(agent)) || labelFor(agent)}.`}
-            {brief.path && (
-              <div className="mt-2" style={{ fontSize: '0.75rem' }}>
-                {brief.path}
-              </div>
-            )}
-          </motion.div>
-        )}
+        {message && <div className="rounded-lg px-3 py-2" style={{ border: "1px solid rgba(248,81,73,0.26)", color: "var(--s-status-error)", background: "rgba(248,81,73,0.06)", fontSize: "var(--t-12)" }}>{message}</div>}
 
-        {/* ---- The standing-order actions list (real /api/actions) ---- */}
-
-        {/* Loading skeleton */}
-        {actions === null && (
-          <div
-            className="p-6 rounded-xl"
-            style={{
-              background: 'var(--servari-glass)',
-              border: '1px solid rgba(250, 248, 243, 0.08)',
-              color: 'var(--servari-dimmed)',
-              fontSize: '0.875rem',
-            }}
-          >
-            Loading standing orders…
-          </div>
-        )}
-
-        {/* Error state */}
-        {actions !== null && actionsError && actions.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-10 rounded-xl flex flex-col items-center text-center gap-4"
-            style={{
-              background: 'var(--servari-glass)',
-              backdropFilter: 'blur(24px)',
-              border: '1px solid rgba(248, 81, 73, 0.2)',
-            }}
-          >
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{
-                background: 'rgba(248, 81, 73, 0.1)',
-                border: '1px solid rgba(248, 81, 73, 0.2)',
-              }}
-            >
-              <XCircle size={28} style={{ color: 'var(--servari-red)' }} />
-            </div>
-            <div style={{ color: 'var(--servari-ivory)', fontSize: '1.125rem', fontWeight: 500 }}>
-              Standing orders unavailable
-            </div>
-            <div style={{ color: 'var(--servari-dimmed)', fontSize: '0.875rem', maxWidth: '28rem', lineHeight: '1.6' }}>
-              {actionsError}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Honest empty state — no actions configured */}
-        {actions !== null && !actionsError && actions.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-10 rounded-xl flex flex-col items-center text-center gap-4"
-            style={{
-              background: 'var(--servari-glass)',
-              backdropFilter: 'blur(24px)',
-              border: '1px solid rgba(250, 248, 243, 0.08)',
-            }}
-          >
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{
-                background: 'rgba(138, 148, 162, 0.1)',
-                border: '1px solid rgba(138, 148, 162, 0.2)',
-              }}
-            >
-              <Inbox size={28} style={{ color: 'var(--servari-dimmed)' }} />
-            </div>
-            <div style={{ color: 'var(--servari-ivory)', fontSize: '1.125rem', fontWeight: 500 }}>
-              No standing orders configured
-            </div>
-            <div style={{ color: 'var(--servari-dimmed)', fontSize: '0.875rem', maxWidth: '28rem', lineHeight: '1.6' }}>
-              When standing orders are defined they appear here, ready to run.
-            </div>
-          </motion.div>
-        )}
-
-        {/* The list */}
-        {actions !== null && actions.length > 0 && (
+        {loading ? (
+          <div className="rounded-lg p-6" style={{ border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-secondary)", background: "var(--s-glass-light)" }}>Loading standing orders...</div>
+        ) : orders.length ? (
           <div className="space-y-3">
-            {actions.map((action, index) => (
-              <OrderCard key={action} action={action} index={index} />
-            ))}
+            {orders.map((order, index) => <OrderCard key={order.id} order={order} index={index} onAfterRun={() => void load()} />)}
+          </div>
+        ) : (
+          <div className="rounded-lg p-10 text-center" style={{ border: "1px dashed var(--s-edge-subtle)", color: "var(--s-text-secondary)", background: "var(--s-glass-light)" }}>
+            No standing orders configured.
           </div>
         )}
       </div>
     </div>
   );
 }
+

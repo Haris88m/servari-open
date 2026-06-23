@@ -1,762 +1,1009 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import * as THREE from "three";
+import { useNavigate } from "react-router";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
-import { Share2, X } from "lucide-react";
-import { API } from "../lib/api";
-import { sealLabel } from "../lib/display_seal";
+import {
+  BrainCircuit,
+  Cpu,
+  FileText,
+  MessageSquare,
+  Network,
+  FolderOpen,
+  RotateCcw,
+  RefreshCw,
+  Save,
+  Search,
+  Settings,
+  Box,
+  X,
+} from "lucide-react";
+import {
+  API,
+  type AgentMapEdge,
+  type AgentMapNode,
+  type AgentMapResponse,
+  type AgentProfileResponse,
+  type ModelConfigResponse,
+} from "../lib/api";
+import { COMPOSED, SNAPPY } from "../lib/motion";
 
-// --- Server shapes (the org registry via /api/org). Typed loosely because the
-//     api client returns `unknown` for these fields; we read defensively. ---
-interface RawOrgNode {
-  name: string;
-  role?: string;
-  reports_to?: string | null;
-  manages?: string[];
-  dir?: string | null;
-  peer?: string;
-  staged?: boolean;
-  is_human?: boolean;
-  skills?: string;
+type Point = { x: number; y: number };
+
+const CANVAS_W = 1500;
+const CANVAS_H = 900;
+const ROOT_ID = "orchestrator";
+
+const STATUS_COLORS: Record<string, string> = {
+  live: "var(--servari-green)",
+  working: "var(--servari-teal)",
+  idle: "var(--servari-dimmed)",
+  done: "var(--servari-green)",
+  blocked: "var(--servari-amber)",
+  error: "var(--servari-red)",
+  not_started: "var(--servari-dimmed)",
+};
+
+const GROUP_COLORS = [
+  "#149C96",
+  "#3FB950",
+  "#E0A92A",
+  "#F85149",
+  "#4EA1D3",
+  "#D68A3A",
+  "#7AC7A7",
+  "#E8C45C",
+];
+
+function colorForGroup(group: string): string {
+  let hash = 0;
+  for (const ch of group || "group") hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return GROUP_COLORS[hash % GROUP_COLORS.length];
 }
 
-interface OrgNode {
-  id: string; // lowercased key derived from name
-  label: string; // short display label
-  fullName: string; // original name for tooltip
-  role: string;
-  level: number;
-  isHuman: boolean;
-  isRoot: boolean;
-  parentId: string | null;
-  live: boolean; // has recent channel activity
-  turns: number;
+function statusColor(status: string): string {
+  return STATUS_COLORS[status] || "var(--servari-dimmed)";
 }
 
-interface OrgEdge {
-  from: string;
-  to: string;
+function shortRole(role: string): string {
+  return (role || "agent").replace(/-/g, " ");
 }
 
-interface CommsRow {
-  agent: string;
-  talksTo: string[];
+function trim(text: string, max = 120): string {
+  const clean = (text || "").replace(/\s+/g, " ").trim();
+  return clean.length > max ? clean.slice(0, max - 1).trimEnd() + "..." : clean;
 }
 
-// The neutral id the chart uses for the always-present orchestrator root.
-const ROOT_ID = "root";
-
-// Turn a node name ("Engineering Lead (Codename)", "R1 Backend & Security",
-// "Operator") into a short chart label + a stable id for edge-matching against
-// reports_to values.
-function shortLabel(name: string): string {
-  const paren = name.replace(/\s*\(.*\)\s*$/, "").trim();
-  const rMatch = paren.match(/^(R\d+|Lead|Head)\b/i);
-  if (rMatch) return rMatch[1].toUpperCase();
-  const first = paren.split(/\s+/)[0];
-  return first.length > 7 ? first.slice(0, 7) : first;
+function nodeSize(node: AgentMapNode): number {
+  if (node.id === ROOT_ID) return 40;
+  if (node.type === "memory") return 16;
+  if (node.status === "live" || node.status === "working") return 24;
+  return 20;
 }
 
-function idFor(name: string): string {
-  return name.toLowerCase().replace(/\s*\(.*\)\s*$/, "").trim().replace(/\s+/g, "-");
+function buildLayout(nodes: AgentMapNode[]): Record<string, Point> {
+  const out: Record<string, Point> = {};
+  out[ROOT_ID] = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+
+  const groups = Array.from(new Set(nodes.filter((n) => n.id !== ROOT_ID).map((n) => n.group || "ungrouped")));
+  const groupCenters: Record<string, Point> = {};
+  groups.forEach((group, index) => {
+    const angle = (index / Math.max(groups.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    groupCenters[group] = {
+      x: CANVAS_W / 2 + Math.cos(angle) * 430,
+      y: CANVAS_H / 2 + Math.sin(angle) * 265,
+    };
+  });
+
+  groups.forEach((group) => {
+    const cluster = nodes.filter((node) => node.id !== ROOT_ID && (node.group || "ungrouped") === group);
+    const center = groupCenters[group] || out[ROOT_ID];
+    cluster.forEach((node, index) => {
+      const ring = Math.floor(index / 9);
+      const slot = index % 9;
+      const angle = (slot / Math.min(cluster.length, 9)) * Math.PI * 2 + ring * 0.42;
+      const radius = 72 + ring * 54;
+      out[node.id] = {
+        x: center.x + Math.cos(angle) * radius,
+        y: center.y + Math.sin(angle) * radius,
+      };
+    });
+  });
+  return out;
 }
 
-// Strip any internal codename in parentheses ("Engineering Lead (Codename)" ->
-// "Engineering Lead") BEFORE the seal maps the residual role to its outward
-// title. Whatever the seal can't map to a clean outward word it hides.
-function sealName(name: string): string {
-  const noParen = name.replace(/\s*\(.*\)\s*$/, "").trim();
-  return sealLabel(noParen) || sealLabel(name) || noParen;
+function pathBetween(a: Point, b: Point): string {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const mx = a.x + dx * 0.5;
+  const my = a.y + dy * 0.5;
+  const bend = Math.min(90, Math.max(-90, dx * 0.08));
+  return `M ${a.x} ${a.y} Q ${mx + bend} ${my - 18}, ${b.x} ${b.y}`;
 }
 
-// Match a chart node to a live channel key from API.state().channels.
-// Channel keys are kebab ("r1-backend-security"); our ids match.
-function channelTurnsFor(id: string, channels: Record<string, { turns?: number }>): number {
-  if (channels[id]) return Number(channels[id].turns ?? 0);
-  // some channels are prefixed (e.g. "team:lead") — try suffix match.
-  for (const [k, v] of Object.entries(channels)) {
-    if (k === id || k.endsWith(":" + id)) return Number(v?.turns ?? 0);
-  }
-  return 0;
+function normalizeRuntime(value: unknown): string {
+  const raw = String(value || "").toLowerCase();
+  return raw || "api";
 }
 
-// The always-present root. When the org registry is empty or unreachable, the
-// chart still renders this single node (the orchestrator is the always-present
-// root) rather than going blank — per the screen contract. It carries the root
-// flag so it draws with the raven mark + ORCHESTRATOR label, exactly like the
-// root node in a fully-populated chart. No sample data is invented.
-function orchestratorOnlyNode(): OrgNode {
-  return {
-    id: ROOT_ID,
-    label: "ORCHESTRATOR",
-    fullName: "orchestrator",
-    role: "",
-    level: 0,
-    isHuman: false,
-    isRoot: true,
-    parentId: null,
-    live: false,
-    turns: 0,
-  };
+function HoverCard({ node, point }: { node: AgentMapNode; point: Point }) {
+  return (
+    <motion.div
+      className="pointer-events-none absolute z-30 w-[300px] rounded-lg p-4"
+      style={{
+        left: `clamp(170px, ${(point.x / CANVAS_W) * 100}%, calc(100% - 170px))`,
+        top: `clamp(128px, ${(point.y / CANVAS_H) * 100}%, calc(100% - 128px))`,
+        transform: "translate(-50%, -50%)",
+        border: "1px solid rgba(20,156,150,0.35)",
+        background: "rgba(15,18,24,0.94)",
+        boxShadow: "0 18px 55px rgba(0,0,0,0.55)",
+        backdropFilter: "blur(22px)",
+      }}
+      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 6, scale: 0.96 }}
+      transition={SNAPPY}
+    >
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-14)", fontWeight: 750 }}>
+            {node.name}
+          </div>
+          <div className="truncate" style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>
+            {shortRole(node.role)} / {node.group || "ungrouped"}
+          </div>
+        </div>
+        <span
+          className="shrink-0 rounded-full px-2 py-1"
+          style={{
+            border: `1px solid ${statusColor(node.status)}`,
+            color: statusColor(node.status),
+            fontSize: "var(--t-10)",
+            fontFamily: "var(--font-mono)",
+            textTransform: "uppercase",
+          }}
+        >
+          {node.status}
+        </span>
+      </div>
+      <div style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-12)", lineHeight: 1.55 }}>
+        {trim(node.current_task || node.latest_reply || "No channel activity yet.", 180)}
+      </div>
+      <div className="mt-3 flex items-center justify-between" style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>
+        <span>{node.turns || 0} turns</span>
+        <span>{node.type === "memory" ? "memory" : node.runtime_backend || "api"}</span>
+      </div>
+      {!!node.memory_files?.length && (
+        <div className="mt-2 truncate" style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>
+          {node.memory_files.length} connected file{node.memory_files.length === 1 ? "" : "s"}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+function Inspector({
+  node,
+  profile,
+  model,
+  brief,
+  saving,
+  onClose,
+  onBriefChange,
+  onProfileField,
+  onSave,
+  onOpenChat,
+}: {
+  node: AgentMapNode;
+  profile: AgentProfileResponse | null;
+  model: ModelConfigResponse | null;
+  brief: string;
+  saving: boolean;
+  onClose: () => void;
+  onBriefChange: (text: string) => void;
+  onProfileField: (field: string, value: string) => void;
+  onSave: () => void;
+  onOpenChat: () => void;
+}) {
+  const form = profile?.profile || node;
+  const providers = model?.providers?.filter((p) => p.id !== "auto") || [];
+  return (
+    <motion.aside
+      className="fixed bottom-0 right-0 top-[46px] z-50 flex w-full max-w-[470px] flex-col"
+      style={{
+        borderLeft: "1px solid rgba(20,156,150,0.25)",
+        background: "rgba(15,18,24,0.97)",
+        boxShadow: "-24px 0 70px rgba(0,0,0,0.55)",
+        backdropFilter: "blur(28px)",
+      }}
+      initial={{ x: "100%" }}
+      animate={{ x: 0 }}
+      exit={{ x: "100%" }}
+      transition={{ type: "spring", stiffness: 260, damping: 30 }}
+    >
+      <div className="flex items-center justify-between gap-3 px-5 py-4" style={{ borderBottom: "1px solid var(--s-edge-subtle)" }}>
+        <div className="min-w-0">
+          <div className="truncate" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-16)", fontWeight: 760 }}>
+            {form.name || node.name}
+          </div>
+          <div className="truncate" style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>
+            {node.source_label || "local profile"} / {node.id}
+          </div>
+        </div>
+        <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded" title="Close">
+          <X size={18} style={{ color: "var(--s-text-secondary)" }} />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-auto p-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1">
+            <span style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>Name</span>
+            <input
+              value={String(form.name || "")}
+              onChange={(event) => onProfileField("name", event.target.value)}
+              className="rounded-lg px-3 py-2 outline-none"
+              style={{ background: "var(--s-glass)", border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-primary)" }}
+            />
+          </label>
+          <label className="grid gap-1">
+            <span style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>Role</span>
+            <input
+              value={String(form.role || "")}
+              onChange={(event) => onProfileField("role", event.target.value)}
+              className="rounded-lg px-3 py-2 outline-none"
+              style={{ background: "var(--s-glass)", border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-primary)" }}
+            />
+          </label>
+          <label className="grid gap-1">
+            <span style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>Group</span>
+            <input
+              value={String(form.group || "")}
+              onChange={(event) => onProfileField("group", event.target.value)}
+              className="rounded-lg px-3 py-2 outline-none"
+              style={{ background: "var(--s-glass)", border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-primary)" }}
+            />
+          </label>
+          <label className="grid gap-1">
+            <span style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>Workflow</span>
+            <input
+              value={String(form.workflow || "")}
+              onChange={(event) => onProfileField("workflow", event.target.value)}
+              className="rounded-lg px-3 py-2 outline-none"
+              style={{ background: "var(--s-glass)", border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-primary)" }}
+            />
+          </label>
+          <label className="grid gap-1 sm:col-span-2">
+            <span style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>Runtime</span>
+            <select
+              value={normalizeRuntime(form.runtime_backend || node.runtime_backend)}
+              onChange={(event) => onProfileField("runtime_backend", event.target.value)}
+              className="rounded-lg px-3 py-2 outline-none"
+              style={{ background: "var(--s-glass)", border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-primary)" }}
+            >
+              {providers.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.label} {provider.available ? "ready" : "not installed"}
+                </option>
+              ))}
+              {!providers.length && <option value="api">API</option>}
+            </select>
+          </label>
+        </div>
+
+        {!!node.memory_files?.length && (
+          <div className="mt-5 rounded-lg p-3" style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(250,248,243,0.025)" }}>
+            <div className="mb-2" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-13)", fontWeight: 700 }}>
+              Connected memory
+            </div>
+            <div className="grid gap-2">
+              {node.memory_files.map((file, index) => (
+                <div key={`${file.path}-${index}`} className="grid grid-cols-[1fr_auto] gap-2" style={{ color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>
+                  <span className="min-w-0 truncate">{file.label || "file"} / {file.path || ""}</span>
+                  <span style={{ color: file.exists ? "var(--s-status-ok)" : "var(--s-status-warn)" }}>{file.exists ? "present" : "missing"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-5">
+          <div className="mb-2 flex items-center gap-2" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-13)", fontWeight: 700 }}>
+            <FileText size={15} style={{ color: "var(--s-text-teal)" }} />
+            START.md
+          </div>
+          <textarea
+            value={brief}
+            onChange={(event) => onBriefChange(event.target.value)}
+            className="h-[360px] w-full resize-none rounded-lg p-3 outline-none"
+            spellCheck={false}
+            style={{
+              background: "rgba(5,8,12,0.72)",
+              border: "1px solid var(--s-edge-subtle)",
+              color: "var(--s-text-primary)",
+              fontFamily: "var(--font-mono)",
+              fontSize: "var(--t-12)",
+              lineHeight: 1.55,
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="flex gap-2 px-5 py-4" style={{ borderTop: "1px solid var(--s-edge-subtle)" }}>
+        <button
+          type="button"
+          onClick={onOpenChat}
+          className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg"
+          style={{ border: "1px solid var(--s-edge-subtle)", color: "var(--s-text-primary)", background: "rgba(250,248,243,0.035)" }}
+        >
+          <MessageSquare size={15} />
+          Chat
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving || node.id === ROOT_ID || node.editable === false}
+          className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg disabled:opacity-45"
+          style={{ border: "1px solid rgba(20,156,150,0.45)", color: "var(--s-text-teal)", background: "rgba(20,156,150,0.10)" }}
+        >
+          <Save size={15} />
+          {saving ? "Saving" : "Save"}
+        </button>
+      </div>
+    </motion.aside>
+  );
+}
+
+function depthForNode(node: AgentMapNode): number {
+  if (node.id === ROOT_ID) return 120;
+  if (node.type === "memory") return -120;
+  let hash = 0;
+  for (const ch of `${node.group}:${node.id}`) hash = (hash * 33 + ch.charCodeAt(0)) >>> 0;
+  return ((hash % 240) - 120) * 0.9;
+}
+
+function edgeColor(kind: string): string {
+  if (kind === "workflow") return "#E0A92A";
+  if (kind === "memory") return "#7AC7A7";
+  return "#149C96";
+}
+
+function Graph3D({
+  nodes,
+  edges,
+  positions,
+  reduce,
+  resetSignal,
+  onHover,
+  onSelect,
+}: {
+  nodes: AgentMapNode[];
+  edges: AgentMapEdge[];
+  positions: Record<string, Point>;
+  reduce: boolean;
+  resetSignal: number;
+  onHover: (id: string | null) => void;
+  onSelect: (id: string) => void;
+}) {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x081016, 0.00042);
+    const camera = new THREE.PerspectiveCamera(52, 1, 1, 5000);
+    camera.position.set(0, 0, 980);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x000000, 0);
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
+    renderer.domElement.style.display = "block";
+    renderer.domElement.style.cursor = "grab";
+    renderer.domElement.style.touchAction = "none";
+    renderer.domElement.dataset.servariGraph3d = "true";
+    mount.appendChild(renderer.domElement);
+
+    const group = new THREE.Group();
+    scene.add(group);
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const meshes: THREE.Mesh[] = [];
+    const nodePosition = new Map<string, THREE.Vector3>();
+    const sphere = new THREE.SphereGeometry(1, 24, 16);
+
+    for (const node of nodes) {
+      const point = positions[node.id];
+      if (!point) continue;
+      const pos = new THREE.Vector3((point.x - CANVAS_W / 2) * 0.82, -(point.y - CANVAS_H / 2) * 0.82, depthForNode(node));
+      nodePosition.set(node.id, pos);
+      const color = node.id === ROOT_ID ? "#149C96" : node.type === "memory" ? "#7AC7A7" : colorForGroup(node.group);
+      const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: node.status === "blocked" ? 0.72 : 1 });
+      const mesh = new THREE.Mesh(sphere, material);
+      const size = nodeSize(node) * (node.type === "memory" ? 0.78 : 1.08);
+      mesh.scale.setScalar(size);
+      mesh.position.copy(pos);
+      mesh.userData.nodeId = node.id;
+      meshes.push(mesh);
+      group.add(mesh);
+
+      const glow = new THREE.Mesh(
+        sphere,
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: node.id === ROOT_ID ? 0.22 : 0.13, wireframe: true }),
+      );
+      glow.scale.setScalar(size * 1.55);
+      glow.position.copy(pos);
+      group.add(glow);
+    }
+
+    for (const edge of edges) {
+      const a = nodePosition.get(edge.source);
+      const b = nodePosition.get(edge.target);
+      if (!a || !b) continue;
+      const geometry = new THREE.BufferGeometry().setFromPoints([a, b]);
+      const material = new THREE.LineBasicMaterial({ color: edgeColor(edge.kind), transparent: true, opacity: edge.kind === "memory" ? 0.68 : 0.48 });
+      group.add(new THREE.Line(geometry, material));
+    }
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+
+    const resize = () => {
+      const rect = mount.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const height = Math.max(1, rect.height);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    };
+    resize();
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(mount);
+
+    const controls = {
+      dragging: false,
+      panning: false,
+      moved: false,
+      lastX: 0,
+      lastY: 0,
+      vx: 0,
+      vy: 0,
+    };
+
+    const resetView = () => {
+      group.rotation.set(0, 0, 0);
+      group.position.set(0, 0, 0);
+      camera.position.set(0, 0, 980);
+      controls.vx = 0;
+      controls.vy = 0;
+    };
+    resetView();
+
+    const hitTest = (event: PointerEvent) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      return raycaster.intersectObjects(meshes, false)[0];
+    };
+
+    const updateHover = (event: PointerEvent) => {
+      const hit = hitTest(event);
+      onHover(hit ? String(hit.object.userData.nodeId) : null);
+      renderer.domElement.style.cursor = hit ? "pointer" : controls.dragging ? "grabbing" : "grab";
+      return hit;
+    };
+
+    const onPointerDown = (event: PointerEvent) => {
+      controls.dragging = true;
+      controls.panning = event.shiftKey || event.button === 1 || event.button === 2;
+      controls.moved = false;
+      controls.lastX = event.clientX;
+      controls.lastY = event.clientY;
+      renderer.domElement.setPointerCapture(event.pointerId);
+      renderer.domElement.style.cursor = "grabbing";
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (!controls.dragging) {
+        updateHover(event);
+        return;
+      }
+      const dx = event.clientX - controls.lastX;
+      const dy = event.clientY - controls.lastY;
+      controls.lastX = event.clientX;
+      controls.lastY = event.clientY;
+      if (Math.abs(dx) + Math.abs(dy) > 2) controls.moved = true;
+      if (controls.panning) {
+        group.position.x += dx * 0.78;
+        group.position.y -= dy * 0.78;
+      } else {
+        group.rotation.y += dx * 0.006;
+        group.rotation.x = Math.max(-1.25, Math.min(1.25, group.rotation.x + dy * 0.006));
+        controls.vx = dx * 0.0009;
+        controls.vy = dy * 0.0006;
+      }
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      const moved = controls.moved;
+      controls.dragging = false;
+      controls.panning = false;
+      try { renderer.domElement.releasePointerCapture(event.pointerId); } catch {}
+      const hit = updateHover(event);
+      if (!moved && hit) onSelect(String(hit.object.userData.nodeId));
+    };
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      camera.position.z = Math.max(360, Math.min(1850, camera.position.z + event.deltaY * 0.72));
+    };
+    const onDoubleClick = () => resetView();
+    const onContextMenu = (event: MouseEvent) => event.preventDefault();
+    const onLeave = () => {
+      controls.dragging = false;
+      onHover(null);
+      renderer.domElement.style.cursor = "grab";
+    };
+
+    renderer.domElement.addEventListener("pointerdown", onPointerDown);
+    renderer.domElement.addEventListener("pointermove", onPointerMove);
+    renderer.domElement.addEventListener("pointerup", onPointerUp);
+    renderer.domElement.addEventListener("pointercancel", onPointerUp);
+    renderer.domElement.addEventListener("pointerleave", onLeave);
+    renderer.domElement.addEventListener("wheel", onWheel, { passive: false });
+    renderer.domElement.addEventListener("dblclick", onDoubleClick);
+    renderer.domElement.addEventListener("contextmenu", onContextMenu);
+
+    let raf = 0;
+    const animate = () => {
+      if (!reduce && !controls.dragging) {
+        group.rotation.y += controls.vx;
+        group.rotation.x = Math.max(-1.25, Math.min(1.25, group.rotation.x + controls.vy));
+        controls.vx *= 0.94;
+        controls.vy *= 0.92;
+      }
+      renderer.render(scene, camera);
+      raf = window.requestAnimationFrame(animate);
+    };
+    animate();
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
+      renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+      renderer.domElement.removeEventListener("pointermove", onPointerMove);
+      renderer.domElement.removeEventListener("pointerup", onPointerUp);
+      renderer.domElement.removeEventListener("pointercancel", onPointerUp);
+      renderer.domElement.removeEventListener("pointerleave", onLeave);
+      renderer.domElement.removeEventListener("wheel", onWheel);
+      renderer.domElement.removeEventListener("dblclick", onDoubleClick);
+      renderer.domElement.removeEventListener("contextmenu", onContextMenu);
+      mount.removeChild(renderer.domElement);
+      sphere.dispose();
+      scene.traverse((object) => {
+        const mesh = object as THREE.Mesh;
+        if (mesh.geometry && mesh.geometry !== sphere) mesh.geometry.dispose();
+        const material = mesh.material;
+        if (Array.isArray(material)) material.forEach((item) => item.dispose());
+        else if (material) material.dispose();
+      });
+      renderer.dispose();
+    };
+  }, [edges, nodes, onHover, onSelect, positions, reduce, resetSignal]);
+
+  return (
+    <div className="relative h-full min-h-[620px] w-full overflow-hidden" title="Drag to rotate. Shift-drag or right-drag to pan. Mouse wheel zooms. Double-click resets.">
+      <div ref={mountRef} className="absolute inset-0" />
+    </div>
+  );
 }
 
 export function OrgChart() {
-  const [nodes, setNodes] = useState<OrgNode[]>([]);
-  const [edges, setEdges] = useState<OrgEdge[]>([]);
-  const [comms, setComms] = useState<CommsRow[]>([]);
-  const [chainRule, setChainRule] = useState<string>("");
-  const [note, setNote] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const reduce = useReducedMotion() ?? false;
+  const [data, setData] = useState<AgentMapResponse | null>(null);
+  const [model, setModel] = useState<ModelConfigResponse | null>(null);
+  const [query, setQuery] = useState("");
+  const [group, setGroup] = useState("all");
   const [hovered, setHovered] = useState<string | null>(null);
-  const [showComms, setShowComms] = useState(false);
-  const reduce = useReducedMotion();
-  const uid = useRef(`og-${Math.random().toString(36).slice(2, 8)}`).current;
+  const [selected, setSelected] = useState<string | null>(null);
+  const [mode, setMode] = useState<"2d" | "3d">("3d");
+  const [graphResetSeq, setGraphResetSeq] = useState(0);
+  const [graphMessage, setGraphMessage] = useState("");
+  const [obsidianBusy, setObsidianBusy] = useState(false);
+  const [profile, setProfile] = useState<AgentProfileResponse | null>(null);
+  const [brief, setBrief] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [map, cfg] = await Promise.all([API.agentMap(), API.modelConfig().catch(() => null)]);
+      setData(map);
+      if (cfg) setModel(cfg);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const selectedNode = useMemo(() => data?.agents.find((node) => node.id === selected) || null, [data, selected]);
 
   useEffect(() => {
     let alive = true;
-    Promise.all([API.org(), API.state().catch(() => null)])
-      .then(([d, st]) => {
+    if (!selectedNode) {
+      setProfile(null);
+      setBrief("");
+      return;
+    }
+    if (selectedNode.id === ROOT_ID) {
+      setProfile({ ok: true, profile: selectedNode, brief: undefined });
+      setBrief("# Orchestrator\n\nCentral SERVARI control plane.");
+      return;
+    }
+    API.agentProfile(selectedNode.id)
+      .then((result) => {
         if (!alive) return;
-        const rawChart = (d.org_chart as RawOrgNode[] | undefined) || [];
-        if (!rawChart.length) {
-          const noteVal =
-            (d._note as string | undefined) ||
-            (d.org_note as string | undefined) ||
-            "Org registry not available yet.";
-          setNote(noteVal);
-          // Per the screen contract: never go blank — render the single
-          // orchestrator node (the always-present root) so the chart still shows
-          // the orchestrator identity while the honest note states why no further
-          // chart loaded. No fabricated data.
-          setNodes([orchestratorOnlyNode()]);
-          setEdges([]);
-          return;
-        }
-
-        const channels =
-          (st?.channels as Record<string, { turns?: number }> | undefined) || {};
-
-        const byId = new Map<string, RawOrgNode>();
-        rawChart.forEach((n) => byId.set(idFor(n.name), n));
-
-        const levelOf = (id: string, seen = new Set<string>()): number => {
-          const n = byId.get(id);
-          if (!n || n.reports_to == null) return 0;
-          if (seen.has(id)) return 0; // cycle guard
-          seen.add(id);
-          const parentId = idFor(n.reports_to);
-          if (!byId.has(parentId)) return 1;
-          return 1 + levelOf(parentId, seen);
-        };
-
-        const orgNodes: OrgNode[] = rawChart.map((n) => {
-          const id = idFor(n.name);
-          const parentId =
-            n.reports_to != null && byId.has(idFor(n.reports_to))
-              ? idFor(n.reports_to)
-              : null;
-          const turns = channelTurnsFor(id, channels);
-          // DISPLAY SEAL: never surface codenames or internal vocab. A human
-          // node keeps its real name; everything else is sealed to a clean
-          // outward label. The root is any node with no parent at the top level.
-          const isHuman = Boolean(n.is_human);
-          const isRoot = id === ROOT_ID || (parentId === null && n.reports_to == null);
-          const sealedFull = isHuman ? n.name : sealName(n.name);
-          const sealedRole = sealLabel(n.role || "");
-          return {
-            id,
-            label: isHuman ? shortLabel(n.name) : sealLabel(shortLabel(n.name)) || shortLabel(n.name),
-            fullName: sealedFull || shortLabel(n.name),
-            role: sealedRole,
-            level: levelOf(id),
-            isHuman,
-            isRoot,
-            parentId,
-            live: turns > 0,
-            turns,
-          };
-        });
-
-        const orgEdges: OrgEdge[] = [];
-        orgNodes.forEach((n) => {
-          if (n.parentId) orgEdges.push({ from: n.parentId, to: n.id });
-        });
-
-        setNodes(orgNodes);
-        setEdges(orgEdges);
-
-        const cm = (d.comms_matrix as Record<string, { talks_to?: string[] }> | undefined) || {};
-        const commsRows: CommsRow[] = Object.entries(cm)
-          .filter(([k]) => !k.startsWith("_"))
-          .map(([agent, v]) => ({
-            // seal the comms-matrix labels too (these are channel keys / names).
-            agent: sealLabel(agent) || agent,
-            talksTo: (Array.isArray(v?.talks_to) ? v.talks_to : []).map((t) => sealLabel(t) || t),
-          }))
-          .filter((r) => r.talksTo.length > 0);
-        setComms(commsRows);
-
-        const rc = d.reporting_chain as { rule?: string } | undefined;
-        if (rc?.rule) setChainRule(sealLabel(rc.rule));
+        setProfile(result);
+        setBrief(result.brief?.brief || "");
       })
-      .catch((e) => {
+      .catch(() => {
         if (!alive) return;
-        setError(String(e));
-        // Even on a hard failure, keep the orchestrator on screen (contract:
-        // single root node) so the view never collapses to nothing.
-        setNodes([orchestratorOnlyNode()]);
-        setEdges([]);
+        setProfile(null);
+        setBrief("");
       });
     return () => {
       alive = false;
     };
+  }, [selectedNode]);
+
+  const visibleNodes = useMemo(() => {
+    const nodes = data?.agents || [];
+    const q = query.trim().toLowerCase();
+    return nodes.filter((node) => {
+      if (node.id === ROOT_ID) return true;
+      if (group !== "all" && node.group !== group) return false;
+      if (!q) return true;
+      return [node.name, node.role, node.group, node.workflow, node.current_task, node.latest_reply].join(" ").toLowerCase().includes(q);
+    });
+  }, [data, group, query]);
+
+  const visibleIds = useMemo(() => new Set(visibleNodes.map((node) => node.id)), [visibleNodes]);
+  const positions = useMemo(() => buildLayout(visibleNodes), [visibleNodes]);
+  const edges = useMemo(
+    () => (data?.edges || []).filter((edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target)).slice(0, 220),
+    [data, visibleIds],
+  );
+  const hoveredNode = hovered ? visibleNodes.find((node) => node.id === hovered) || null : null;
+  const groups = data?.groups || [];
+  const handleHover = useCallback((id: string | null) => setHovered(id), []);
+  const handleSelect = useCallback((id: string) => setSelected(id), []);
+
+  const runObsidianAction = useCallback(async (action: "sync" | "open-folder" | "open-obsidian") => {
+    setObsidianBusy(true);
+    setGraphMessage("");
+    try {
+      const result = await API.obsidianAction(action);
+      if (result.ok) {
+        setGraphMessage(`${result.notes || 0} Obsidian notes at ${result.path}`);
+      } else {
+        setGraphMessage(result.error || "Obsidian action failed.");
+      }
+    } catch (error) {
+      setGraphMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setObsidianBusy(false);
+    }
   }, []);
 
-  // --- Layout: root at top center, heads fanned in a row, members fanned under
-  //     each head. Width scales to the widest level so nothing collides. ---
-  const layout = useMemo(() => {
-    const byLevel: Record<number, OrgNode[]> = {};
-    nodes.forEach((n) => {
-      (byLevel[n.level] = byLevel[n.level] || []).push(n);
+  const updateProfileField = useCallback((field: string, value: string) => {
+    setProfile((current) => {
+      if (!current?.profile) return current;
+      return { ...current, profile: { ...current.profile, [field]: value } };
     });
-    const levels = Object.keys(byLevel).map(Number).sort((a, b) => a - b);
-    const maxCount = levels.reduce((m, l) => Math.max(m, byLevel[l].length), 1);
+  }, []);
 
-    const colW = 132; // horizontal slot per node on the widest row
-    const rowH = 168; // vertical gap between levels
-    const padX = 80;
-    const padTop = 90;
-    const width = Math.max(960, maxCount * colW + padX * 2);
-
-    // Group children under their parent's horizontal center where possible so
-    // the fan reads as a real tree, not a generic grid.
-    const pos: Record<string, { x: number; y: number }> = {};
-
-    // Level 0 + 1 (human + root): center them.
-    levels.forEach((lvl) => {
-      const row = byLevel[lvl];
-      const y = padTop + lvl * rowH;
-      if (lvl <= 1) {
-        const spacing = (width - padX * 2) / (row.length + 1);
-        row.forEach((n, i) => {
-          pos[n.id] = { x: padX + spacing * (i + 1), y };
-        });
+  const saveSelected = useCallback(async () => {
+    if (!selectedNode || selectedNode.id === ROOT_ID) return;
+    setSaving(true);
+    try {
+      if (profile?.profile) {
+        await API.saveAgentProfile({ ...profile.profile, id: selectedNode.id });
       }
-    });
-
-    // Heads (level 2) — even fan across the canvas.
-    const heads = (byLevel[2] || []);
-    if (heads.length) {
-      const spacing = (width - padX * 2) / (heads.length + 1);
-      heads.forEach((h, i) => {
-        pos[h.id] = { x: padX + spacing * (i + 1), y: padTop + 2 * rowH };
-      });
+      await API.saveAgentBrief(selectedNode.id, brief);
+      await load();
+    } finally {
+      setSaving(false);
     }
-
-    // Members (level 3+) — clustered under their parent head, fanned symmetrically.
-    levels.filter((l) => l >= 3).forEach((lvl) => {
-      const row = byLevel[lvl];
-      const y = padTop + lvl * rowH;
-      // bucket members by parent
-      const buckets: Record<string, OrgNode[]> = {};
-      row.forEach((n) => {
-        const p = n.parentId || "_orphan";
-        (buckets[p] = buckets[p] || []).push(n);
-      });
-      Object.entries(buckets).forEach(([pid, members]) => {
-        const center = pos[pid]?.x ?? width / 2;
-        const fanW = Math.min(colW, (width - padX * 2) / Math.max(row.length, 1));
-        const total = (members.length - 1) * fanW;
-        members.forEach((s, i) => {
-          let x = center - total / 2 + i * fanW;
-          x = Math.max(padX + 28, Math.min(width - padX - 28, x));
-          pos[s.id] = { x, y };
-        });
-      });
-    });
-
-    const maxLevel = levels.length ? Math.max(...levels) : 0;
-    const height = padTop + maxLevel * rowH + 110;
-    return { pos, width, height };
-  }, [nodes]);
-
-  const { pos, width: svgWidth, height: svgHeight } = layout;
-
-  // True when the chart is the lone-orchestrator fallback (empty/unreachable
-  // registry): one node, the root, no edges. The honest note still shows in
-  // this case so the screen states WHY the rest of the chart is absent.
-  const orchestratorOnly =
-    nodes.length === 1 && nodes[0]?.isRoot && edges.length === 0;
-
-  // Quadratic-bezier path parent->child with a gentle downward bow.
-  const edgePath = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-    const midY = (a.y + b.y) / 2;
-    return `M ${a.x} ${a.y + 38} C ${a.x} ${midY}, ${b.x} ${midY}, ${b.x} ${b.y - 38}`;
-  };
-
-  // Edges touching the hovered node light up; its sub-tree stays bright.
-  const edgeActive = (e: OrgEdge) =>
-    hovered != null && (e.from === hovered || e.to === hovered);
-
-  const hoveredNode = hovered ? nodes.find((n) => n.id === hovered) : null;
-
-  // Stagger timing: root wave first, heads next, members last — by level.
-  const nodeDelay = (n: OrgNode) => {
-    if (reduce) return 0;
-    if (n.level <= 1) return 0.05 * n.level;
-    if (n.level === 2) return 0.35 + 0.12 * 0; // heads handled per-index below
-    return 0.9;
-  };
-  const indexInLevel = (n: OrgNode) =>
-    nodes.filter((m) => m.level === n.level).indexOf(n);
-
-  const entranceDelay = (n: OrgNode) => {
-    if (reduce) return 0;
-    const i = indexInLevel(n);
-    if (n.level <= 1) return 0.05 * n.level;
-    if (n.level === 2) return 0.35 + i * 0.12;
-    return 0.85 + i * 0.06;
-  };
-  const lineDelay = (e: OrgEdge) => {
-    const child = nodes.find((n) => n.id === e.to);
-    return child ? Math.max(0, entranceDelay(child) - 0.1) : 0.3;
-  };
+  }, [brief, load, profile, selectedNode]);
 
   return (
-    <div className="h-full p-8 overflow-auto relative">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
-          <div
-            style={{
-              color: "var(--servari-ivory)",
-              fontSize: "1.5rem",
-              letterSpacing: "1px",
-            }}
-          >
-            ORG CHART
+    <div className="h-full overflow-hidden p-4 md:p-6 xl:p-8">
+      <div className="mx-auto flex h-full max-w-[1600px] flex-col gap-4">
+        <motion.header
+          className="flex flex-col gap-3 rounded-lg px-4 py-4 lg:flex-row lg:items-center lg:justify-between"
+          style={{
+            border: "1px solid var(--s-edge-accent)",
+            background: "linear-gradient(135deg, rgba(20,156,150,0.13), rgba(18,22,30,0.72))",
+          }}
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={COMPOSED}
+        >
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-2" style={{ color: "var(--s-text-teal)", fontSize: "var(--t-11)", letterSpacing: "var(--ls-caps)", textTransform: "uppercase" }}>
+              <BrainCircuit size={15} />
+              Agent Neural Map
+            </div>
+            <h1 className="truncate" style={{ color: "var(--s-text-primary)", fontSize: "var(--t-24)", fontWeight: 780, letterSpacing: 0 }}>
+              Agent Memory Graph
+            </h1>
           </div>
-
-          {comms.length > 0 && (
-            <motion.button
-              onClick={() => setShowComms((v) => !v)}
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg"
-              style={{
-                background: showComms
-                  ? "rgba(20, 156, 150, 0.16)"
-                  : "var(--servari-glass)",
-                backdropFilter: "blur(20px)",
-                border: showComms
-                  ? "1px solid rgba(20, 156, 150, 0.45)"
-                  : "1px solid rgba(250, 248, 243, 0.1)",
-                color: showComms ? "var(--servari-teal-soft)" : "var(--servari-dimmed)",
-                fontSize: "0.8125rem",
-                letterSpacing: "0.5px",
-              }}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <label
+              className="flex h-10 min-w-0 items-center gap-2 rounded-lg px-3"
+              style={{ border: "1px solid var(--s-edge-subtle)", background: "var(--s-glass)" }}
             >
-              <Share2 size={14} />
-              connections
-            </motion.button>
-          )}
-        </div>
-
-        {error && (
-          <div
-            className="mb-6 p-4 rounded-xl"
-            style={{
-              background: "var(--servari-glass)",
-              border: "1px solid rgba(248, 81, 73, 0.2)",
-              color: "var(--servari-dimmed)",
-              fontSize: "0.8125rem",
-            }}
-          >
-            Org chart unavailable: {error}
-          </div>
-        )}
-
-        {note && (!nodes.length || orchestratorOnly) && (
-          <div
-            className="mb-6 p-4 rounded-xl"
-            style={{
-              background: "var(--servari-glass)",
-              border: "1px solid rgba(250, 248, 243, 0.08)",
-              color: "var(--servari-dimmed)",
-              fontSize: "0.875rem",
-              lineHeight: "1.6",
-            }}
-          >
-            {note}
-          </div>
-        )}
-
-        {nodes.length > 0 && (
-          <div className="relative">
-            <svg
-              width={svgWidth}
-              height={svgHeight}
-              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-              className="w-full"
-              style={{ overflow: "visible" }}
+              <Search size={15} style={{ color: "var(--s-text-secondary)" }} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search agents"
+                className="w-full bg-transparent outline-none sm:w-56"
+                style={{ color: "var(--s-text-primary)", fontSize: "var(--t-12)" }}
+              />
+            </label>
+            <select
+              value={group}
+              onChange={(event) => setGroup(event.target.value)}
+              className="h-10 rounded-lg px-3 outline-none"
+              style={{ border: "1px solid var(--s-edge-subtle)", background: "var(--s-glass)", color: "var(--s-text-primary)", fontSize: "var(--t-12)" }}
             >
-              <defs>
-                <filter id={`${uid}-glow`} x="-60%" y="-60%" width="220%" height="220%">
-                  <feGaussianBlur stdDeviation="3.2" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-                <radialGradient id={`${uid}-rootFill`} cx="50%" cy="38%" r="75%">
-                  <stop offset="0%" stopColor="#1b2230" />
-                  <stop offset="100%" stopColor="var(--servari-panel)" />
-                </radialGradient>
-                <radialGradient id={`${uid}-ripple`} cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor="rgba(20,156,150,0.35)" />
-                  <stop offset="70%" stopColor="rgba(20,156,150,0.10)" />
-                  <stop offset="100%" stopColor="rgba(20,156,150,0)" />
-                </radialGradient>
-              </defs>
-
-              {/* Self-drawing connection lines */}
-              {edges.map((edge) => {
-                const start = pos[edge.from];
-                const end = pos[edge.to];
-                if (!start || !end) return null;
-                const active = edgeActive(edge);
-                return (
-                  <motion.path
-                    key={`${edge.from}-${edge.to}`}
-                    d={edgePath(start, end)}
-                    fill="none"
-                    stroke="var(--servari-teal)"
-                    strokeWidth={active ? 2.4 : 1.5}
-                    strokeLinecap="round"
-                    filter={`url(#${uid}-glow)`}
-                    initial={{ pathLength: 0, opacity: 0 }}
-                    animate={{
-                      pathLength: 1,
-                      opacity: active ? 0.95 : 0.34,
-                    }}
-                    transition={{
-                      pathLength: {
-                        duration: reduce ? 0 : 0.5,
-                        delay: lineDelay(edge),
-                        ease: "easeInOut",
-                      },
-                      opacity: { duration: 0.3 },
-                      strokeWidth: { duration: 0.25 },
-                    }}
-                  />
-                );
-              })}
-
-              {/* Nodes */}
-              {nodes.map((node) => {
-                const p = pos[node.id];
-                if (!p) return null;
-                const r = node.isRoot ? 46 : node.level <= 2 ? 38 : 32;
-                const isHover = hovered === node.id;
-                const ringColor = node.isHuman
-                  ? "var(--servari-amber)"
-                  : "var(--servari-teal)";
-                return (
-                  <motion.g
-                    key={node.id}
-                    style={{ cursor: "default" }}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{
-                      delay: entranceDelay(node),
-                      type: "spring",
-                      stiffness: 220,
-                      damping: 16,
-                    }}
-                    onMouseEnter={() => setHovered(node.id)}
-                    onMouseLeave={() => setHovered((h) => (h === node.id ? null : h))}
-                  >
-                    {/* hover lift wrapper */}
-                    <motion.g
-                      animate={{ scale: isHover ? 1.08 : 1 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 18 }}
-                      style={{ transformOrigin: `${p.x}px ${p.y}px`, transformBox: "fill-box" } as React.CSSProperties}
-                    >
-                      {/* ENTRANCE ripple — one soft teal pulse on arrival */}
-                      <motion.circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={r}
-                        fill={`url(#${uid}-ripple)`}
-                        initial={{ scale: 0.6, opacity: 0 }}
-                        animate={{ scale: [0.6, 2.1], opacity: [0.7, 0] }}
-                        transition={{
-                          delay: entranceDelay(node) + 0.05,
-                          duration: reduce ? 0 : 1.1,
-                          ease: "easeOut",
-                        }}
-                        style={{ transformOrigin: `${p.x}px ${p.y}px`, transformBox: "fill-box" } as React.CSSProperties}
-                      />
-
-                      {/* LIVE pulse — slow teal breathing ring for active agents */}
-                      {node.live && !reduce && (
-                        <motion.circle
-                          cx={p.x}
-                          cy={p.y}
-                          r={r + 5}
-                          fill="none"
-                          stroke="var(--servari-teal)"
-                          strokeWidth={1.4}
-                          animate={{ opacity: [0.5, 0.05, 0.5], scale: [1, 1.14, 1] }}
-                          transition={{
-                            duration: 3.2,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                            delay: entranceDelay(node) + 1,
-                          }}
-                          style={{ transformOrigin: `${p.x}px ${p.y}px`, transformBox: "fill-box" } as React.CSSProperties}
-                        />
-                      )}
-
-                      {/* node body */}
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={r}
-                        fill={node.isRoot ? `url(#${uid}-rootFill)` : "var(--servari-panel)"}
-                        stroke={ringColor}
-                        strokeWidth={node.isRoot ? 2.6 : isHover ? 2.2 : 1.6}
-                        filter={isHover || node.isRoot ? `url(#${uid}-glow)` : undefined}
-                        opacity={node.isRoot ? 1 : node.live ? 1 : 0.92}
-                      />
-
-                      {/* the root carries the raven mark */}
-                      {node.isRoot ? (
-                        <>
-                          <clipPath id={`${uid}-clip`}>
-                            <circle cx={p.x} cy={p.y} r={r - 4} />
-                          </clipPath>
-                          <image
-                            href="/raven.png"
-                            x={p.x - (r - 4)}
-                            y={p.y - (r - 4)}
-                            width={(r - 4) * 2}
-                            height={(r - 4) * 2}
-                            clipPath={`url(#${uid}-clip)`}
-                            preserveAspectRatio="xMidYMid slice"
-                            opacity={0.95}
-                          />
-                          <text
-                            x={p.x}
-                            y={p.y + r + 16}
-                            textAnchor="middle"
-                            fill="var(--servari-teal-soft)"
-                            fontSize="11"
-                            letterSpacing="2"
-                            fontFamily="var(--font-mono)"
-                          >
-                            ORCHESTRATOR
-                          </text>
-                        </>
-                      ) : (
-                        <text
-                          x={p.x}
-                          y={p.y}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                          fill={node.isHuman ? "var(--servari-amber)" : "var(--servari-ivory)"}
-                          fontSize={node.level <= 2 ? 13 : 11}
-                          fontFamily="var(--font-mono)"
-                          style={{ pointerEvents: "none" }}
-                        >
-                          {node.label}
-                        </text>
-                      )}
-                    </motion.g>
-                  </motion.g>
-                );
-              })}
-            </svg>
-
-            {/* Hover tooltip card — absolutely positioned over the SVG via % */}
-            <AnimatePresence>
-              {hoveredNode && pos[hoveredNode.id] && (
-                <motion.div
-                  key={hoveredNode.id}
-                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 6, scale: 0.97 }}
-                  transition={{ type: "spring", stiffness: 320, damping: 24 }}
-                  className="pointer-events-none absolute z-30 w-64 p-4 rounded-xl"
+              <option value="all">All groups</option>
+              {groups.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label} {item.count ? `(${item.count})` : ""}
+                </option>
+              ))}
+            </select>
+            <div className="grid h-10 grid-cols-2 rounded-lg p-1" style={{ border: "1px solid var(--s-edge-subtle)", background: "var(--s-glass)" }}>
+              {(["3d", "2d"] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setMode(item)}
+                  className="inline-flex items-center justify-center gap-2 rounded-md px-3"
                   style={{
-                    left: `${(pos[hoveredNode.id].x / svgWidth) * 100}%`,
-                    top: `${(pos[hoveredNode.id].y / svgHeight) * 100}%`,
-                    transform: "translate(-50%, -118%)",
-                    background: "rgba(18, 22, 30, 0.92)",
-                    backdropFilter: "blur(24px)",
-                    border: "1px solid rgba(20, 156, 150, 0.35)",
-                    boxShadow: "0 18px 48px -12px rgba(0,0,0,0.7)",
+                    background: mode === item ? "rgba(20,156,150,0.16)" : "transparent",
+                    color: mode === item ? "var(--s-text-teal)" : "var(--s-text-secondary)",
+                    fontSize: "var(--t-12)",
+                    minWidth: 52,
                   }}
                 >
-                  <div
-                    className="mb-1 flex items-center gap-2"
-                    style={{
-                      color: hoveredNode.isHuman
-                        ? "var(--servari-amber)"
-                        : "var(--servari-teal-soft)",
-                      fontSize: "0.9375rem",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {hoveredNode.fullName}
-                    {hoveredNode.live && (
-                      <span
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: "var(--servari-green)" }}
-                      />
-                    )}
-                  </div>
-                  {hoveredNode.role && (
-                    <div
-                      style={{
-                        color: "var(--servari-dimmed)",
-                        fontSize: "0.78rem",
-                        lineHeight: "1.45",
-                      }}
-                    >
-                      {hoveredNode.role}
-                    </div>
-                  )}
-                  <div
-                    className="mt-2 pt-2 flex items-center justify-between"
-                    style={{
-                      borderTop: "1px solid rgba(250,248,243,0.08)",
-                      fontSize: "0.72rem",
-                    }}
-                  >
-                    <span style={{ color: "var(--servari-dimmed)" }}>
-                      {hoveredNode.isHuman
-                        ? "human"
-                        : hoveredNode.live
-                          ? `${hoveredNode.turns} turns`
-                          : "standby"}
-                    </span>
-                    <span
-                      style={{
-                        color: hoveredNode.live
-                          ? "var(--servari-green)"
-                          : "var(--servari-dimmed)",
-                      }}
-                    >
-                      {hoveredNode.live ? "live" : "idle"}
-                    </span>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  {item === "3d" ? <Box size={14} /> : <Network size={14} />}
+                  {item.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setGraphResetSeq((value) => value + 1)}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3"
+              style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(250,248,243,0.035)", color: "var(--s-text-primary)", fontSize: "var(--t-12)" }}
+            >
+              <RotateCcw size={15} />
+              Reset
+            </button>
+            <button
+              type="button"
+              onClick={() => void runObsidianAction("sync")}
+              disabled={obsidianBusy}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 disabled:opacity-50"
+              style={{ border: "1px solid rgba(20,156,150,0.38)", background: "rgba(20,156,150,0.08)", color: "var(--s-text-teal)", fontSize: "var(--t-12)" }}
+            >
+              <Network size={15} />
+              Sync Vault
+            </button>
+            <button
+              type="button"
+              onClick={() => void runObsidianAction("open-obsidian")}
+              disabled={obsidianBusy}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 disabled:opacity-50"
+              style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(250,248,243,0.035)", color: "var(--s-text-primary)", fontSize: "var(--t-12)" }}
+            >
+              <FolderOpen size={15} />
+              Open Vault
+            </button>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3"
+              style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(250,248,243,0.035)", color: "var(--s-text-primary)", fontSize: "var(--t-12)" }}
+            >
+              <RefreshCw size={15} />
+              {loading ? "Loading" : "Refresh"}
+            </button>
           </div>
-        )}
+        </motion.header>
+
+        <div
+          className="relative min-h-0 flex-1 overflow-auto rounded-lg"
+          style={{
+            border: "1px solid var(--s-edge-subtle)",
+            background: "radial-gradient(circle at 50% 45%, rgba(20,156,150,0.12), transparent 34%), rgba(9,12,17,0.58)",
+          }}
+        >
+          {mode === "3d" ? (
+            <Graph3D
+              nodes={visibleNodes}
+              edges={edges}
+              positions={positions}
+              reduce={reduce}
+              resetSignal={graphResetSeq}
+              onHover={handleHover}
+              onSelect={handleSelect}
+            />
+          ) : (
+          <svg width={CANVAS_W} height={CANVAS_H} viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`} className="min-h-full min-w-full">
+            <defs>
+              <filter id="agent-neural-glow" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <radialGradient id="agent-root-fill" cx="50%" cy="40%" r="70%">
+                <stop offset="0%" stopColor="#1d2832" />
+                <stop offset="100%" stopColor="#10141c" />
+              </radialGradient>
+            </defs>
+
+            {edges.map((edge) => {
+              const a = positions[edge.source];
+              const b = positions[edge.target];
+              if (!a || !b) return null;
+              const active = hovered === edge.source || hovered === edge.target || selected === edge.source || selected === edge.target;
+              return (
+                <motion.path
+                  key={edge.id}
+                  d={pathBetween(a, b)}
+                  fill="none"
+                  stroke={edge.kind === "workflow" ? "rgba(224,169,42,0.44)" : "rgba(20,156,150,0.40)"}
+                  strokeWidth={active ? 2.3 : 1.1}
+                  strokeDasharray={edge.kind === "workflow" ? "4 7" : undefined}
+                  filter={active ? "url(#agent-neural-glow)" : undefined}
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: active ? 0.95 : 0.36 }}
+                  transition={{ duration: reduce ? 0 : 0.55, ease: "easeOut" }}
+                />
+              );
+            })}
+
+            {visibleNodes.map((node) => {
+              const point = positions[node.id];
+              if (!point) return null;
+              const size = nodeSize(node);
+              const selectedNow = selected === node.id;
+              const hoveredNow = hovered === node.id;
+              const stroke = node.id === ROOT_ID ? "var(--servari-teal)" : colorForGroup(node.group);
+              return (
+                <motion.g
+                  key={node.id}
+                  onMouseEnter={() => setHovered(node.id)}
+                  onMouseLeave={() => setHovered((current) => (current === node.id ? null : current))}
+                  onClick={() => setSelected(node.id)}
+                  style={{ cursor: "pointer" }}
+                  initial={{ opacity: 0, scale: 0.2 }}
+                  animate={{ opacity: 1, scale: selectedNow || hoveredNow ? 1.12 : 1 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                >
+                  {!reduce && (node.status === "live" || node.status === "working") && (
+                    <motion.circle
+                      cx={point.x}
+                      cy={point.y}
+                      r={size + 8}
+                      fill="none"
+                      stroke={statusColor(node.status)}
+                      strokeWidth={1.3}
+                      animate={{ opacity: [0.6, 0.05, 0.6], scale: [1, 1.34, 1] }}
+                      transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                      style={{ transformOrigin: `${point.x}px ${point.y}px`, transformBox: "fill-box" } as CSSProperties}
+                    />
+                  )}
+                  <circle
+                    cx={point.x}
+                    cy={point.y}
+                    r={size}
+                    fill={node.id === ROOT_ID ? "url(#agent-root-fill)" : "rgba(18,22,30,0.96)"}
+                    stroke={selectedNow ? "var(--servari-ivory)" : stroke}
+                    strokeWidth={selectedNow ? 3 : hoveredNow ? 2.5 : 1.6}
+                    filter={selectedNow || hoveredNow || node.id === ROOT_ID ? "url(#agent-neural-glow)" : undefined}
+                  />
+                  <circle cx={point.x + size * 0.52} cy={point.y - size * 0.52} r={4.5} fill={statusColor(node.status)} />
+                  {node.id === ROOT_ID ? (
+                    <image href="/raven.png" x={point.x - 24} y={point.y - 24} width={48} height={48} preserveAspectRatio="xMidYMid meet" />
+                  ) : (
+                    <text
+                      x={point.x}
+                      y={point.y + 4}
+                      textAnchor="middle"
+                      fill="var(--s-text-primary)"
+                      fontFamily="var(--font-mono)"
+                      fontSize={Math.max(9, Math.min(12, 110 / Math.max(node.name.length, 6)))}
+                      style={{ pointerEvents: "none" }}
+                    >
+                      {node.name.split(" ")[0].slice(0, 9)}
+                    </text>
+                  )}
+                  {(hoveredNow || selectedNow) && (
+                    <text
+                      x={point.x}
+                      y={point.y + size + 18}
+                      textAnchor="middle"
+                      fill="var(--s-text-secondary)"
+                      fontFamily="var(--font-mono)"
+                      fontSize={10}
+                      style={{ pointerEvents: "none" }}
+                    >
+                      {trim(node.name, 24)}
+                    </text>
+                  )}
+                </motion.g>
+              );
+            })}
+          </svg>
+          )}
+
+          {graphMessage && (
+            <div className="absolute left-4 top-4 z-20 max-w-[min(560px,calc(100%-2rem))] rounded-lg px-3 py-2" style={{ border: "1px solid var(--s-edge-subtle)", background: "rgba(15,18,24,0.92)", color: "var(--s-text-secondary)", fontSize: "var(--t-11)" }}>
+              {graphMessage}
+            </div>
+          )}
+          <AnimatePresence>
+            {hoveredNode && positions[hoveredNode.id] && <HoverCard node={hoveredNode} point={positions[hoveredNode.id]} />}
+          </AnimatePresence>
+        </div>
       </div>
 
-      {/* Comms-matrix slide-in panel */}
       <AnimatePresence>
-        {showComms && comms.length > 0 && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="fixed inset-0 z-40"
-              style={{ background: "rgba(8, 10, 14, 0.4)", backdropFilter: "blur(2px)" }}
-              onClick={() => setShowComms(false)}
-            />
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", stiffness: 260, damping: 30 }}
-              className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm p-6 overflow-y-auto"
-              style={{
-                background: "rgba(15, 18, 24, 0.96)",
-                backdropFilter: "blur(28px)",
-                borderLeft: "1px solid rgba(20, 156, 150, 0.22)",
-                boxShadow: "-24px 0 60px -20px rgba(0,0,0,0.8)",
-              }}
-            >
-              <div className="flex items-center justify-between mb-5">
-                <div
-                  style={{
-                    color: "var(--servari-ivory)",
-                    fontSize: "0.9375rem",
-                    letterSpacing: "1px",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Communications Matrix
-                </div>
-                <button
-                  onClick={() => setShowComms(false)}
-                  className="p-1.5 rounded hover:bg-white/5 transition-colors"
-                  style={{ color: "var(--servari-dimmed)" }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {comms.map((row, index) => (
-                  <motion.div
-                    key={row.agent}
-                    initial={{ opacity: 0, x: 16 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.08 + index * 0.035, type: "spring", stiffness: 260, damping: 24 }}
-                    className="py-2.5 px-3 rounded-lg"
-                    style={{
-                      background: "rgba(20, 156, 150, 0.05)",
-                      border: "1px solid rgba(20, 156, 150, 0.1)",
-                      fontSize: "0.8125rem",
-                    }}
-                  >
-                    <div style={{ color: "var(--servari-teal)", marginBottom: "0.2rem" }}>
-                      {row.agent}
-                    </div>
-                    <div style={{ color: "var(--servari-dimmed)", lineHeight: "1.4" }}>
-                      {"-> "}
-                      {row.talksTo.join(", ")}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-
-              {chainRule && (
-                <div
-                  className="mt-6 pt-4"
-                  style={{ borderTop: "1px solid rgba(250, 248, 243, 0.1)" }}
-                >
-                  <div
-                    className="mb-2"
-                    style={{
-                      color: "var(--servari-ivory)",
-                      fontSize: "0.8125rem",
-                      letterSpacing: "1px",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Reporting Chain
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "0.8125rem",
-                      color: "var(--servari-dimmed)",
-                      lineHeight: "1.5",
-                    }}
-                  >
-                    {chainRule}
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          </>
+        {selectedNode && (
+          <Inspector
+            node={selectedNode}
+            profile={profile}
+            model={model}
+            brief={brief}
+            saving={saving}
+            onClose={() => setSelected(null)}
+            onBriefChange={setBrief}
+            onProfileField={updateProfileField}
+            onSave={() => void saveSelected()}
+            onOpenChat={() => navigate(`/shell/chat?agent=${encodeURIComponent(selectedNode.id)}`)}
+          />
         )}
       </AnimatePresence>
+
+      <div
+        className="pointer-events-none fixed bottom-20 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-4 rounded-lg px-4 py-2 md:flex"
+        style={{ border: "1px solid var(--s-edge-accent)", background: "rgba(15,18,24,0.96)", color: "var(--s-text-secondary)", fontSize: "var(--t-11)", boxShadow: "0 18px 48px rgba(0,0,0,0.45)" }}
+      >
+        <span className="inline-flex items-center gap-2">
+          <BrainCircuit size={14} style={{ color: "var(--s-text-teal)" }} />
+          {visibleNodes.length} nodes
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <Cpu size={14} style={{ color: "var(--s-status-ok)" }} />
+          {model?.effective_backend || "backend pending"}
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <Settings size={14} />
+select node
+        </span>
+      </div>
     </div>
   );
 }
+
+export default OrgChart;

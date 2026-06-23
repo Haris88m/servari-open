@@ -1,0 +1,161 @@
+{
+  "_schema": "servari.agent_workflows.v1",
+  "_doc": "Synthetic local workflow lanes for the agent workspace UI. These are demo coordination plans, not proof of an autonomous execution engine.",
+  "workflows": [
+    {
+      "id": "daily-ops-loop",
+      "title": "Daily Ops Loop",
+      "status": "Command keeps intake, schedule, finance, and memory current.",
+      "current_step": "ops-route",
+      "steps": [
+        { "id": "ops-intake", "label": "Intake sweep", "owner": "Intake Agent", "state": "done", "summary": "New work is classified by source, urgency, and required gate." },
+        { "id": "ops-route", "label": "Route work", "owner": "Chief of Staff", "state": "working", "summary": "Active items are assigned to the right local channel with a visible next action." },
+        { "id": "ops-cash", "label": "Cash check", "owner": "Cashflow Agent", "state": "review", "summary": "Invoices and spend risks are checked before any paid action moves." },
+        { "id": "ops-archive", "label": "Archive decision", "owner": "Archivist", "state": "ready", "summary": "Final decisions are written to the memory surface after review." }
+      ]
+    },
+    {
+      "id": "career-pipeline",
+      "title": "Career Pipeline",
+      "status": "Opportunity discovery feeds pursuit follow-up and review.",
+      "current_step": "career-shortlist",
+      "steps": [
+        { "id": "career-scan", "label": "Scan signals", "owner": "Opportunity Scout", "state": "working", "summary": "Find matching roles, clients, and partnership leads from the local source list." },
+        { "id": "career-shortlist", "label": "Shortlist fit", "owner": "Pursuit Agent", "state": "working", "summary": "Turn promising leads into ranked next steps with owner and due date." },
+        { "id": "career-review", "label": "Review language", "owner": "Review Agent", "state": "ready", "summary": "Check outbound wording before anything is sent externally.", "gate": "real-send" }
+      ]
+    },
+    {
+      "id": "build-review",
+      "title": "Build / Review",
+      "status": "Research, implementation, and review stay in one loop.",
+      "current_step": "build-verify",
+      "steps": [
+        { "id": "build-context", "label": "Collect context", "owner": "Research Agent", "state": "done", "summary": "Gather implementation constraints and source references." },
+        { "id": "build-change", "label": "Make change", "owner": "Build Agent", "state": "working", "summary": "Patch the smallest useful slice and keep unrelated files untouched." },
+        { "id": "build-verify", "label": "Verify", "owner": "Review Agent", "state": "review", "summary": "Run local tests, inspect browser routes, and flag release risks." }
+      ]
+    },
+    {
+      "id": "approval-gates",
+      "title": "Approval Gates",
+      "status": "Consequential work remains behind explicit operator gates.",
+      "current_step": "gate-explain",
+      "steps": [
+        { "id": "gate-score", "label": "Score risk", "owner": "Gatekeeper", "state": "working", "summary": "Classify deploy, spend, real-send, publish, merge, and secret actions." },
+        { "id": "gate-explain", "label": "Explain gate", "owner": "Gatekeeper", "state": "review", "summary": "Summarize why a queued action needs approval before it can proceed.", "gate": "human-approval" },
+        { "id": "gate-record", "label": "Record decision", "owner": "Archivist", "state": "ready", "summary": "Append the approved or rejected decision to local memory." }
+      ]
+    },
+    {
+      "id": "release-readiness",
+      "title": "Release Readiness",
+      "status": "Runtime health, release notes, and gates converge before handoff.",
+      "current_step": "release-smoke",
+      "steps": [
+        { "id": "release-runtime", "label": "Runtime watch", "owner": "Runtime Watch", "state": "working", "summary": "Watch server routes, browser console health, and runtime start/stop state." },
+        { "id": "release-smoke", "label": "Smoke routes", "owner": "Release Manager", "state": "review", "summary": "Confirm the verified routes and browser screens still load cleanly." },
+        { "id": "release-gate", "label": "Final gate", "owner": "Gatekeeper", "state": "ready", "summary": "Hold any publish, deploy, or merge action until the operator approves.", "gate": "publish" }
+      ]
+    },
+    {
+      "id": "trade-research-loop",
+      "title": "Trade Research Loop",
+      "status": "Market, technical, fundamental, sentiment, on-chain, and tokenomics signals roll up to a gated research brief.",
+      "current_step": "trade-synthesis",
+      "steps": [
+        { "id": "trade-morning", "label": "Morning brief", "owner": "Trade Morning Brief", "state": "done", "summary": "Prepare a dated market brief from operator-approved inputs." },
+        { "id": "trade-signals", "label": "Signal sweep", "owner": "Market Snapshot", "state": "working", "summary": "Collect fast market, technical, sentiment, and on-chain signals." },
+        { "id": "trade-synthesis", "label": "Synthesize", "owner": "Trade Desk Lead", "state": "review", "summary": "Merge research into educational scenarios before risk review.", "gate": "trade-intent" }
+      ]
+    },
+    {
+      "id": "trade-risk-loop",
+      "title": "Trade Risk Loop",
+      "status": "Risk sizing, alert design, and exit planning stay research-only until approved.",
+      "current_step": "trade-risk",
+      "steps": [
+        { "id": "trade-risk", "label": "Risk matrix", "owner": "Trading Risk Manager", "state": "review", "summary": "Convert research scenarios into risk notes and paper-trade boundaries.", "gate": "trade-risk" },
+        { "id": "trade-exit", "label": "Exit plan", "owner": "Exit Planner", "state": "working", "summary": "Draft exit criteria without live order execution." },
+        { "id": "trade-alert", "label": "Alert design", "owner": "Alert Builder", "state": "ready", "summary": "Prepare alerts for review without connecting to real brokerage execution." }
+      ]
+    },
+    {
+      "id": "trade-learning-loop",
+      "title": "Trade Learning Loop",
+      "status": "Journal, autopsy, weekly review, and report packaging turn paper-trade history into lessons.",
+      "current_step": "trade-review",
+      "steps": [
+        { "id": "trade-journal", "label": "Journal", "owner": "Trade Journalist", "state": "working", "summary": "Capture structured paper-trade notes and context." },
+        { "id": "trade-review", "label": "Weekly review", "owner": "Trade Weekly Review", "state": "review", "summary": "Summarize patterns for the coach and risk manager." },
+        { "id": "trade-report", "label": "Package report", "owner": "Trade Report Packager", "state": "ready", "summary": "Prepare report outlines for approval before distribution.", "gate": "publish" }
+      ]
+    },
+    {
+      "id": "paid-project-loop",
+      "title": "Paid Project Loop",
+      "status": "Consulting, legal discovery, and portfolio monitoring lanes stay proof-backed and gated.",
+      "current_step": "project-curation",
+      "steps": [
+        { "id": "project-curation", "label": "Curate assets", "owner": "Consulting Curator", "state": "working", "summary": "Turn notes and assets into reusable paid-service playbooks." },
+        { "id": "project-domain", "label": "Domain review", "owner": "Legal Discovery Agent", "state": "review", "summary": "Organize document review without legal determinations.", "gate": "legal-review" },
+        { "id": "project-proof", "label": "Proof bundle", "owner": "Proof of Work Reporter", "state": "ready", "summary": "Package evidence for customer review before any send." }
+      ]
+    },
+    {
+      "id": "platform-delivery-loop",
+      "title": "Platform Delivery Loop",
+      "status": "Architecture, integration, implementation, QA, and release packaging move together.",
+      "current_step": "platform-qa",
+      "steps": [
+        { "id": "platform-architecture", "label": "Shape slice", "owner": "Staff Architect", "state": "done", "summary": "Keep the delivery scope small, testable, and aligned to existing patterns." },
+        { "id": "platform-build", "label": "Build", "owner": "Full-Stack Builder", "state": "working", "summary": "Implement the API and UI slice with matching data contracts." },
+        { "id": "platform-qa", "label": "QA / security", "owner": "QA Security Sentinel", "state": "review", "summary": "Probe routes, buttons, and tenant-safety assumptions before release.", "gate": "release" }
+      ]
+    },
+    {
+      "id": "saas-control-loop",
+      "title": "SaaS Control Loop",
+      "status": "Tenant onboarding, billing quota, runtime, fast verify, and proof-of-work stay auditable.",
+      "current_step": "control-verify",
+      "steps": [
+        { "id": "control-onboarding", "label": "Onboard tenant", "owner": "Tenant Onboarding Operator", "state": "working", "summary": "Prepare setup checklists without granting access or changing billing." },
+        { "id": "control-runtime", "label": "Runtime state", "owner": "Tenant Runtime Operator", "state": "working", "summary": "Track per-tenant readiness and incident notes." },
+        { "id": "control-verify", "label": "Verify packet", "owner": "Fast Verify Gate Operator", "state": "review", "summary": "Bundle evidence for approval before consequential actions.", "gate": "human-approval" }
+      ]
+    },
+    {
+      "id": "product-catalog-loop",
+      "title": "Product Catalog Loop",
+      "status": "Capabilities are cataloged, evaluated, and packaged only when evidence supports the claim.",
+      "current_step": "catalog-eval",
+      "steps": [
+        { "id": "catalog-plan", "label": "Plan bundle", "owner": "Product Capability Planner", "state": "working", "summary": "Group paid agents into coherent capability packages." },
+        { "id": "catalog-curate", "label": "Curate catalog", "owner": "Capability Catalog Curator", "state": "working", "summary": "Map each capability to source paths and proof notes." },
+        { "id": "catalog-eval", "label": "Evaluate", "owner": "Eval Lead", "state": "review", "summary": "Define pass/fail expectations before readiness is advertised.", "gate": "claim-review" }
+      ]
+    },
+    {
+      "id": "customer-growth-loop",
+      "title": "Customer Growth Loop",
+      "status": "Customer comms, launch drafts, and SDR work remain draft-only until reviewed.",
+      "current_step": "growth-launch",
+      "steps": [
+        { "id": "growth-comms", "label": "Customer update", "owner": "Customer Comms Chief", "state": "working", "summary": "Draft customer-facing status updates from verified evidence." },
+        { "id": "growth-launch", "label": "Launch draft", "owner": "Marketing Launch Agent", "state": "review", "summary": "Prepare launch material with claim-evidence checks.", "gate": "publish" },
+        { "id": "growth-leads", "label": "Lead shortlist", "owner": "Lead Gen SDR", "state": "ready", "summary": "Research leads and draft outreach without sending." }
+      ]
+    },
+    {
+      "id": "growth-ops-loop",
+      "title": "Growth Ops Loop",
+      "status": "Communications, lead research, and cost awareness stay coordinated for paid growth work.",
+      "current_step": "growth-review",
+      "steps": [
+        { "id": "growth-draft", "label": "Draft update", "owner": "Communications Agent", "state": "working", "summary": "Turn verified work into review-ready communication drafts." },
+        { "id": "growth-review", "label": "Review cost", "owner": "Cost Accountant", "state": "review", "summary": "Check usage and spend implications before campaigns or customer promises." },
+        { "id": "growth-gate", "label": "Gate send", "owner": "Gatekeeper", "state": "ready", "summary": "Hold outbound sends and public claims until approved.", "gate": "real-send" }
+      ]
+    }
+  ]
+}

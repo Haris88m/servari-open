@@ -2,18 +2,76 @@
   "_doc": "Demo org chart + comms matrix for /api/org (OrgChart). Replace with your own roster. is_human:true keeps a node's real name; all other labels pass the display seal.",
   "org_chart": [
     { "name": "Operator", "role": "Operator", "reports_to": null, "is_human": true, "manages": ["Orchestrator"] },
-    { "name": "Orchestrator", "role": "Orchestrator", "reports_to": "Operator", "manages": ["builder", "researcher", "reviewer", "scheduler"] },
-    { "name": "builder", "role": "Build Agent", "reports_to": "Orchestrator" },
-    { "name": "researcher", "role": "Research Agent", "reports_to": "Orchestrator" },
-    { "name": "reviewer", "role": "Review Agent", "reports_to": "Orchestrator" },
-    { "name": "scheduler", "role": "Scheduling Agent", "reports_to": "Orchestrator" }
+    { "name": "Orchestrator", "role": "Command orchestration", "reports_to": "Operator", "manages": ["Chief of Staff", "Build Agent", "Research Agent", "Review Agent", "Gatekeeper", "Release Manager", "Trade Desk Lead", "Staff Architect", "Product Capability Planner"] },
+
+    { "name": "Chief of Staff", "role": "Routing and daily operations", "reports_to": "Orchestrator", "manages": ["Intake Agent", "Opportunity Scout", "Pursuit Agent", "Cashflow Agent", "Scheduling Agent", "Archivist", "Runtime Watch", "Consulting Curator", "Portco Monitor", "Communications Agent", "Tenant Onboarding Operator", "Proof of Work Reporter"] },
+    { "name": "Intake Agent", "role": "Triage", "reports_to": "Chief of Staff" },
+    { "name": "Opportunity Scout", "role": "Career and deal research", "reports_to": "Chief of Staff" },
+    { "name": "Pursuit Agent", "role": "Follow-up planning", "reports_to": "Chief of Staff" },
+    { "name": "Cashflow Agent", "role": "Finance watch", "reports_to": "Chief of Staff", "manages": ["Cost Accountant", "Billing Quota Sentinel"] },
+    { "name": "Scheduling Agent", "role": "Calendar and cadence", "reports_to": "Chief of Staff" },
+    { "name": "Archivist", "role": "Memory and decisions", "reports_to": "Chief of Staff" },
+    { "name": "Runtime Watch", "role": "Runtime health", "reports_to": "Chief of Staff", "manages": ["Tenant Runtime Operator"] },
+    { "name": "Consulting Curator", "role": "Consulting knowledge assets", "reports_to": "Chief of Staff" },
+    { "name": "Portco Monitor", "role": "Portfolio monitoring", "reports_to": "Chief of Staff" },
+    { "name": "Communications Agent", "role": "Communications drafting", "reports_to": "Chief of Staff", "manages": ["Lead Gen SDR", "Customer Comms Chief"] },
+    { "name": "Tenant Onboarding Operator", "role": "Paid tenant setup", "reports_to": "Chief of Staff" },
+    { "name": "Proof of Work Reporter", "role": "Delivery evidence", "reports_to": "Chief of Staff" },
+
+    { "name": "Build Agent", "role": "Implementation", "reports_to": "Orchestrator" },
+    { "name": "Research Agent", "role": "Research", "reports_to": "Orchestrator" },
+    { "name": "Review Agent", "role": "Review", "reports_to": "Orchestrator" },
+    { "name": "Gatekeeper", "role": "Risk and approval gates", "reports_to": "Orchestrator", "manages": ["Legal Discovery Agent", "Fast Verify Gate Operator", "Trading Risk Manager"] },
+    { "name": "Release Manager", "role": "Release readiness", "reports_to": "Orchestrator", "manages": ["Release Platform"] },
+
+    { "name": "Trade Desk Lead", "role": "Trade research orchestration", "reports_to": "Orchestrator", "manages": ["Trade Morning Brief", "Market Snapshot", "Technical Analyst", "Fundamental Analyst", "Sentiment Analyst", "On-Chain Analyst", "Tokenomics Analyst", "Alert Builder", "Trade Journalist", "Trade Coach", "Trade Weekly Review", "Trade Report Packager"] },
+    { "name": "Trade Morning Brief", "role": "Morning market brief", "reports_to": "Trade Desk Lead" },
+    { "name": "Market Snapshot", "role": "Fast market read", "reports_to": "Trade Desk Lead" },
+    { "name": "Technical Analyst", "role": "Technical analysis", "reports_to": "Trade Desk Lead" },
+    { "name": "Fundamental Analyst", "role": "Fundamental analysis", "reports_to": "Trade Desk Lead" },
+    { "name": "Sentiment Analyst", "role": "Sentiment analysis", "reports_to": "Trade Desk Lead" },
+    { "name": "On-Chain Analyst", "role": "On-chain analysis", "reports_to": "Trade Desk Lead" },
+    { "name": "Tokenomics Analyst", "role": "Tokenomics analysis", "reports_to": "Trade Desk Lead" },
+    { "name": "Trading Risk Manager", "role": "Trade risk review", "reports_to": "Gatekeeper", "manages": ["Exit Planner"] },
+    { "name": "Alert Builder", "role": "Alert design", "reports_to": "Trade Desk Lead" },
+    { "name": "Exit Planner", "role": "Exit system design", "reports_to": "Trading Risk Manager" },
+    { "name": "Trade Journalist", "role": "Trade journaling", "reports_to": "Trade Desk Lead" },
+    { "name": "Trade Coach", "role": "Trade review coaching", "reports_to": "Trade Desk Lead" },
+    { "name": "Trade Weekly Review", "role": "Weekly trade review", "reports_to": "Trade Desk Lead" },
+    { "name": "Trade Report Packager", "role": "Report packaging", "reports_to": "Trade Desk Lead" },
+
+    { "name": "Staff Architect", "role": "Platform architecture", "reports_to": "Orchestrator", "manages": ["AI Integration Engineer", "Full-Stack Builder", "QA Security Sentinel", "Local Repo Researcher", "SERVARI Repo Monitor"] },
+    { "name": "AI Integration Engineer", "role": "Integration engineering", "reports_to": "Staff Architect" },
+    { "name": "Full-Stack Builder", "role": "Full-stack build", "reports_to": "Staff Architect" },
+    { "name": "QA Security Sentinel", "role": "QA and security", "reports_to": "Staff Architect" },
+    { "name": "Release Platform", "role": "Release packaging", "reports_to": "Release Manager" },
+    { "name": "Local Repo Researcher", "role": "Local repository scan", "reports_to": "Staff Architect" },
+    { "name": "SERVARI Repo Monitor", "role": "Repository monitoring", "reports_to": "Staff Architect" },
+
+    { "name": "Product Capability Planner", "role": "Product packaging", "reports_to": "Orchestrator", "manages": ["Capability Catalog Curator", "Eval Lead"] },
+    { "name": "Capability Catalog Curator", "role": "Capability catalog", "reports_to": "Product Capability Planner" },
+    { "name": "Eval Lead", "role": "Evaluation design", "reports_to": "Product Capability Planner" },
+
+    { "name": "Legal Discovery Agent", "role": "Document review support", "reports_to": "Gatekeeper" },
+    { "name": "Cost Accountant", "role": "Cost and usage accounting", "reports_to": "Cashflow Agent" },
+    { "name": "Billing Quota Sentinel", "role": "Billing and quota watch", "reports_to": "Cashflow Agent" },
+    { "name": "Tenant Runtime Operator", "role": "Tenant runtime state", "reports_to": "Runtime Watch" },
+    { "name": "Fast Verify Gate Operator", "role": "Fast approval packets", "reports_to": "Gatekeeper" },
+    { "name": "Lead Gen SDR", "role": "Lead research", "reports_to": "Communications Agent" },
+    { "name": "Customer Comms Chief", "role": "Customer communications", "reports_to": "Communications Agent", "manages": ["Marketing Launch Agent"] },
+    { "name": "Marketing Launch Agent", "role": "Launch messaging", "reports_to": "Customer Comms Chief" }
   ],
   "comms_matrix": {
-    "Orchestrator": { "talks_to": ["builder", "researcher", "reviewer", "scheduler"] },
-    "researcher": { "talks_to": ["reviewer"] },
-    "builder": { "talks_to": ["reviewer"] }
+    "Orchestrator": { "talks_to": ["Chief of Staff", "Build Agent", "Research Agent", "Review Agent", "Gatekeeper", "Release Manager", "Trade Desk Lead", "Staff Architect", "Product Capability Planner"] },
+    "Chief of Staff": { "talks_to": ["Intake Agent", "Opportunity Scout", "Pursuit Agent", "Cashflow Agent", "Scheduling Agent", "Archivist", "Runtime Watch", "Consulting Curator", "Portco Monitor", "Communications Agent", "Tenant Onboarding Operator", "Proof of Work Reporter"] },
+    "Trade Desk Lead": { "talks_to": ["Trade Morning Brief", "Market Snapshot", "Technical Analyst", "Fundamental Analyst", "Sentiment Analyst", "On-Chain Analyst", "Tokenomics Analyst", "Trading Risk Manager", "Alert Builder", "Trade Journalist", "Trade Coach", "Trade Weekly Review", "Trade Report Packager"] },
+    "Staff Architect": { "talks_to": ["AI Integration Engineer", "Full-Stack Builder", "QA Security Sentinel", "Release Platform", "Local Repo Researcher", "SERVARI Repo Monitor"] },
+    "Product Capability Planner": { "talks_to": ["Capability Catalog Curator", "Eval Lead", "Staff Architect"] },
+    "Gatekeeper": { "talks_to": ["Review Agent", "Release Manager", "Legal Discovery Agent", "Fast Verify Gate Operator", "Trading Risk Manager", "Archivist"] },
+    "Communications Agent": { "talks_to": ["Lead Gen SDR", "Customer Comms Chief", "Marketing Launch Agent"] },
+    "Release Manager": { "talks_to": ["Runtime Watch", "Release Platform", "Gatekeeper"] }
   },
   "reporting_chain": {
-    "rule": "The Operator speaks to the Orchestrator; the Orchestrator runs the agents."
+    "rule": "The Operator speaks to the Orchestrator; the Orchestrator and lane owners route local agent channels. Trade, legal, billing, deploy, publish, and real-send actions remain human-gated."
   }
 }

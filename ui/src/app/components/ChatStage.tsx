@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
-import { Lock, Unlock, Volume2, VolumeX, Send, MessageCircle, X } from "lucide-react";
+import {
+  Lock,
+  Unlock,
+  Volume2,
+  VolumeX,
+  Send,
+  MessageCircle,
+  X,
+} from "lucide-react";
 import { API, type Turn } from "../lib/api";
 import { Voice, speakNeural, type ConversationState } from "../lib/voice";
 import { VoiceOrb } from "./VoiceOrb";
@@ -13,6 +21,10 @@ interface Message {
   id: string;
   role: "operator" | "system";
   content: string;
+  // Carried through from Turn.error so model-failure turns render as a
+  // visibly-distinct (orange) error bubble instead of a normal grey one —
+  // consistent with ChatPanel.
+  error?: boolean;
 }
 
 // Map a raw voice error reason -> the EXACT, human-visible message the user
@@ -70,9 +82,11 @@ function isEchoOfSelf(transcript: string, lastSystemTexts: string[]): boolean {
 // everyone/everything else is the system voice (left).
 function turnToMessage(t: Turn, index: number): Message {
   const from = (t.from || "").toLowerCase();
-  const role: Message["role"] = from === "operator" ? "operator" : "system";
-  const id = t.turn !== undefined && t.turn !== null ? `t${t.turn}` : `i${index}`;
-  return { id, role, content: t.text ?? "" };
+  const role: Message["role"] =
+    from === "operator" || from === "user" ? "operator" : "system";
+  const id =
+    t.turn !== undefined && t.turn !== null ? `t${t.turn}` : `i${index}`;
+  return { id, role, content: t.text ?? "", error: t.error === true };
 }
 
 const NUM_BARS = 20;
@@ -85,7 +99,10 @@ const NUM_BARS = 20;
 // Read live (not cached) so it stays correct even if mount order shifts.
 function globalVoicePresent(): boolean {
   if (typeof window === "undefined") return false;
-  return (window as unknown as { __servariGlobalVoice?: boolean }).__servariGlobalVoice === true;
+  return (
+    (window as unknown as { __servariGlobalVoice?: boolean })
+      .__servariGlobalVoice === true
+  );
 }
 
 export function ChatStage() {
@@ -185,7 +202,11 @@ export function ChatStage() {
       .filter((t) => {
         const n = typeof t.turn === "number" ? t.turn : -1;
         const from = (t.from || "").toLowerCase();
-        return n > lastSpokenTurnRef.current && from !== "operator";
+        return (
+          n > lastSpokenTurnRef.current &&
+          from !== "operator" &&
+          from !== "user"
+        );
       })
       .sort((a, b) => (Number(a.turn) || 0) - (Number(b.turn) || 0));
 
@@ -221,7 +242,9 @@ export function ChatStage() {
 
   // FIX — keep the last-2-system-turns ref current for the echo filter.
   useEffect(() => {
-    const systemTexts = messages.filter((m) => m.role === "system").map((m) => m.content);
+    const systemTexts = messages
+      .filter((m) => m.role === "system")
+      .map((m) => m.content);
     lastSystemTurnsRef.current = systemTexts.slice(-2);
   }, [messages]);
 
@@ -241,11 +264,14 @@ export function ChatStage() {
 
   // Amplitude handler shared by every voice path: drives the waveform AND tracks
   // the running peak so the silent-mic detector can tell if the mic hears anything.
-  const onAmp = useCallback((level: number) => {
-    setAmplitude(level);
-    if (level > maxAmpRef.current) maxAmpRef.current = level;
-    if (level >= 0.01 && micSilent) setMicSilent(false);
-  }, [micSilent]);
+  const onAmp = useCallback(
+    (level: number) => {
+      setAmplitude(level);
+      if (level > maxAmpRef.current) maxAmpRef.current = level;
+      if (level >= 0.01 && micSilent) setMicSilent(false);
+    },
+    [micSilent],
+  );
 
   // Silent-mic detector: while listening, if 8s pass with peak amplitude < 0.01,
   // surface "I can't hear anything" (keep listening — don't tear the loop down).
@@ -345,7 +371,7 @@ export function ChatStage() {
       for (const t of turns) {
         const from = (t.from || "").toLowerCase();
         const n = typeof t.turn === "number" ? t.turn : -1;
-        if (from !== "operator" && n > max) max = n;
+        if (from !== "operator" && from !== "user" && n > max) max = n;
       }
       return max;
     } catch {
@@ -406,7 +432,7 @@ export function ChatStage() {
           for (const t of turns) {
             const from = (t.from || "").toLowerCase();
             const n = typeof t.turn === "number" ? t.turn : -1;
-            if (from !== "operator" && n > bestN && t.text) {
+            if (from !== "operator" && from !== "user" && n > bestN && t.text) {
               bestN = n;
               bestText = t.text;
             }
@@ -442,7 +468,8 @@ export function ChatStage() {
         // A transient transcribe miss keeps the loop alive (voice.ts resumes
         // listening) — only tear the UI down for hard errors (mic/permission).
         const hard =
-          reason !== "transcribe_failed" && reason !== "transcribe_request_failed";
+          reason !== "transcribe_failed" &&
+          reason !== "transcribe_request_failed";
         setVoiceError(voiceErrorMessage(reason));
         if (hard) {
           convActiveRef.current = false;
@@ -470,7 +497,7 @@ export function ChatStage() {
   // natural instinct when it seems stuck. If NOT yet conversing, click enters the
   // loop. Leaving the loop is the separate end-conversation 'x' button.
   //
- // When the GLOBAL voice surface is present (the normal case inside Shell), the
+  // When the GLOBAL voice surface is present (the normal case inside Shell), the
   // mic click DELEGATES to it via 'servari:activate-voice' — GlobalVoice owns the
   // conversation loop so it survives navigation. ChatStage does NOT run its own
   // loop in that case.
@@ -541,17 +568,21 @@ export function ChatStage() {
               <div
                 className="max-w-[80%] px-4 py-3 rounded-2xl"
                 style={{
-                  background: message.role === "operator"
-                    ? 'rgba(20, 156, 150, 0.15)'
-                    : 'var(--servari-glass)',
-                  backdropFilter: 'blur(12px)',
-                  border: message.role === "operator"
-                    ? '1px solid rgba(20, 156, 150, 0.3)'
-                    : '1px solid rgba(250, 248, 243, 0.04)',
-                  color: 'var(--servari-ivory)',
-                  fontSize: '0.9375rem',
-                  lineHeight: '1.6',
-                  whiteSpace: 'pre-wrap',
+                  background: message.error
+                    ? "rgba(217, 119, 6, 0.10)"
+                    : message.role === "operator"
+                      ? "rgba(20, 156, 150, 0.15)"
+                      : "var(--servari-glass)",
+                  backdropFilter: "blur(12px)",
+                  border: message.error
+                    ? "1px solid rgba(217, 119, 6, 0.55)"
+                    : message.role === "operator"
+                      ? "1px solid rgba(20, 156, 150, 0.3)"
+                      : "1px solid rgba(250, 248, 243, 0.04)",
+                  color: message.error ? "#f59e0b" : "var(--servari-ivory)",
+                  fontSize: "0.9375rem",
+                  lineHeight: "1.6",
+                  whiteSpace: "pre-wrap",
                 }}
               >
                 {message.content}
@@ -581,7 +612,7 @@ export function ChatStage() {
                   <motion.div
                     key={i}
                     className="w-1 rounded-full"
-                    style={{ background: 'var(--servari-teal)' }}
+                    style={{ background: "var(--servari-teal)" }}
                     animate={{ height: Math.max(8, h) }}
                     transition={{ duration: 0.12, ease: "easeOut" }}
                   />
@@ -598,32 +629,50 @@ export function ChatStage() {
         {(isListening || voiceError || echoFiltered) && !globalVoice && (
           <div
             className="mb-3 flex items-center justify-center gap-2 px-3 text-center"
-            style={{ fontSize: "0.8125rem", letterSpacing: "0.3px", minHeight: "1.4em" }}
+            style={{
+              fontSize: "0.8125rem",
+              letterSpacing: "0.3px",
+              minHeight: "1.4em",
+            }}
           >
             {voiceError ? (
               <span style={{ color: "var(--servari-red)" }}>{voiceError}</span>
             ) : echoFiltered ? (
-              <span style={{ color: "var(--servari-dimmed)" }}>(echo filtered)</span>
+              <span style={{ color: "var(--servari-dimmed)" }}>
+                (echo filtered)
+              </span>
             ) : micSilent ? (
               <span style={{ color: "var(--servari-red)" }}>
-                I can't hear anything — your mic may be muted or the wrong input device
+                I can't hear anything — your mic may be muted or the wrong input
+                device
               </span>
             ) : convState === "transcribing" ? (
-              <span style={{ color: "var(--servari-teal)" }}>heard you — transcribing…</span>
+              <span style={{ color: "var(--servari-teal)" }}>
+                heard you — transcribing…
+              </span>
             ) : convState === "speaking" ? (
               <span style={{ color: "var(--servari-teal)" }}>speaking…</span>
             ) : (
-              <span className="flex items-center gap-2" style={{ color: "var(--servari-teal)" }}>
+              <span
+                className="flex items-center gap-2"
+                style={{ color: "var(--servari-teal)" }}
+              >
                 listening…
                 {/* tiny live amplitude bar — width tracks the running level */}
                 <span
                   className="inline-block rounded-full overflow-hidden"
-                  style={{ width: 56, height: 4, background: "rgba(250, 248, 243, 0.12)" }}
+                  style={{
+                    width: 56,
+                    height: 4,
+                    background: "rgba(250, 248, 243, 0.12)",
+                  }}
                 >
                   <motion.span
                     className="block h-full rounded-full"
                     style={{ background: "var(--servari-teal)" }}
-                    animate={{ width: `${Math.min(100, Math.round(amplitude * 100))}%` }}
+                    animate={{
+                      width: `${Math.min(100, Math.round(amplitude * 100))}%`,
+                    }}
                     transition={{ duration: 0.12, ease: "easeOut" }}
                   />
                 </span>
@@ -686,9 +735,17 @@ export function ChatStage() {
               >
                 <motion.span
                   className="inline-block rounded-full"
-                  style={{ width: 8, height: 8, background: "var(--servari-red)" }}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    background: "var(--servari-red)",
+                  }}
                   animate={{ opacity: [1, 0.25, 1], scale: [1, 1.25, 1] }}
-                  transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                  transition={{
+                    duration: 1.2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
                 />
                 <span
                   style={{
@@ -711,9 +768,9 @@ export function ChatStage() {
           <div
             className="flex items-center gap-4 p-4 rounded-2xl"
             style={{
-              background: 'var(--servari-glass)',
-              backdropFilter: 'blur(24px)',
-              border: '1px solid rgba(250, 248, 243, 0.08)',
+              background: "var(--servari-glass)",
+              backdropFilter: "blur(24px)",
+              border: "1px solid rgba(250, 248, 243, 0.08)",
             }}
           >
             {/* Text input */}
@@ -727,11 +784,15 @@ export function ChatStage() {
                   void send(input);
                 }
               }}
-              placeholder={agentLabel ? `Speak or type to ${agentLabel}...` : "Speak or type your command..."}
+              placeholder={
+                agentLabel
+                  ? `Speak or type to ${agentLabel}...`
+                  : "Speak or type your command..."
+              }
               className="flex-1 bg-transparent outline-none"
               style={{
-                color: 'var(--servari-ivory)',
-                fontSize: '0.9375rem',
+                color: "var(--servari-ivory)",
+                fontSize: "0.9375rem",
               }}
             />
 
@@ -742,7 +803,14 @@ export function ChatStage() {
               className="p-2 rounded hover:bg-white/5 transition-colors disabled:opacity-30"
               title="Send"
             >
-              <Send size={16} style={{ color: input.trim() ? 'var(--servari-teal)' : 'var(--servari-dimmed)' }} />
+              <Send
+                size={16}
+                style={{
+                  color: input.trim()
+                    ? "var(--servari-teal)"
+                    : "var(--servari-dimmed)",
+                }}
+              />
             </button>
 
             {/* TTS toggle */}
@@ -752,9 +820,9 @@ export function ChatStage() {
               title={ttsOn ? "Voice replies on" : "Voice replies off"}
             >
               {ttsOn ? (
-                <Volume2 size={16} style={{ color: 'var(--servari-teal)' }} />
+                <Volume2 size={16} style={{ color: "var(--servari-teal)" }} />
               ) : (
-                <VolumeX size={16} style={{ color: 'var(--servari-dimmed)' }} />
+                <VolumeX size={16} style={{ color: "var(--servari-dimmed)" }} />
               )}
             </button>
 
@@ -762,7 +830,8 @@ export function ChatStage() {
             <button
               onClick={() => {
                 // leaving conversation mode? tear the loop down cleanly first.
-                if (voiceMode === "conversation" && Voice.inConversation) stopConversation();
+                if (voiceMode === "conversation" && Voice.inConversation)
+                  stopConversation();
                 else if (isListening) stopVoice();
                 setVoiceMode(
                   voiceMode === "conversation"
@@ -782,26 +851,31 @@ export function ChatStage() {
               }
             >
               {voiceMode === "conversation" ? (
-                <MessageCircle size={16} style={{ color: 'var(--servari-teal)' }} />
+                <MessageCircle
+                  size={16}
+                  style={{ color: "var(--servari-teal)" }}
+                />
               ) : voiceMode === "push-to-talk" ? (
-                <Unlock size={16} style={{ color: 'var(--servari-dimmed)' }} />
+                <Unlock size={16} style={{ color: "var(--servari-dimmed)" }} />
               ) : (
-                <Lock size={16} style={{ color: 'var(--servari-teal)' }} />
+                <Lock size={16} style={{ color: "var(--servari-teal)" }} />
               )}
             </button>
 
             {/* End-conversation button — only while a hands-free loop is live.
                 The mic's single click SENDS (flush); THIS leaves the loop.
                 Suppressed when GlobalVoice owns the loop (it has its own X). */}
-            {voiceMode === "conversation" && Voice.inConversation && !globalVoice && (
-              <button
-                onClick={stopConversation}
-                className="p-2 rounded hover:bg-white/5 transition-colors"
-                title="End conversation"
-              >
-                <X size={16} style={{ color: "var(--servari-red)" }} />
-              </button>
-            )}
+            {voiceMode === "conversation" &&
+              Voice.inConversation &&
+              !globalVoice && (
+                <button
+                  onClick={stopConversation}
+                  className="p-2 rounded hover:bg-white/5 transition-colors"
+                  title="End conversation"
+                >
+                  <X size={16} style={{ color: "var(--servari-red)" }} />
+                </button>
+              )}
 
             {/* Large mic button — behavior follows the active voice mode.
                 conversation: single click SENDS (flush); 'x' ends the loop.
@@ -810,7 +884,9 @@ export function ChatStage() {
             <motion.button
               onMouseDown={() => voiceMode === "push-to-talk" && startVoice()}
               onMouseUp={() => voiceMode === "push-to-talk" && stopVoice()}
-              onMouseLeave={() => voiceMode === "push-to-talk" && isListening && stopVoice()}
+              onMouseLeave={() =>
+                voiceMode === "push-to-talk" && isListening && stopVoice()
+              }
               onClick={() => {
                 // conversation mode: single click SENDS (flush) if already in the
                 // loop, else enters it. Ending the loop is the separate 'x' button.
@@ -829,11 +905,11 @@ export function ChatStage() {
               className="relative w-[72px] h-[72px] rounded-full flex items-center justify-center -m-2"
               style={{
                 background: isListening
-                  ? 'radial-gradient(circle, var(--servari-teal) 0%, var(--servari-teal-dark) 100%)'
-                  : 'var(--servari-panel)',
+                  ? "radial-gradient(circle, var(--servari-teal) 0%, var(--servari-teal-dark) 100%)"
+                  : "var(--servari-panel)",
                 border: isListening
-                  ? '2px solid var(--servari-teal)'
-                  : '2px solid var(--servari-edge-2)',
+                  ? "2px solid var(--servari-teal)"
+                  : "2px solid var(--servari-edge-2)",
               }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -842,44 +918,56 @@ export function ChatStage() {
                   conversation mode the ring speed reflects the sub-state:
                   listening = steady pulse, transcribing = quick shimmer,
                   speaking = slow soft ripple. Classic modes keep the 2s pulse. */}
-              {isListening && (() => {
-                // ringDur drives the visible feedback per state.
-                const inConv = voiceMode === "conversation";
-                const ringDur =
-                  inConv && convState === "transcribing"
-                    ? 0.9 // shimmer — fast
-                    : inConv && convState === "speaking"
-                      ? 3.2 // soft ripple — slow
-                      : 2; // listening / classic — steady
-                return (
-                  <>
-                    <motion.div
-                      className="absolute inset-0 rounded-full"
-                      style={{ border: '2px solid var(--servari-teal)' }}
-                      animate={{ scale: [1, 1.3, 1.3], opacity: [0.6, 0, 0] }}
-                      transition={{ duration: ringDur, repeat: Infinity, ease: "easeOut" }}
-                    />
-                    <motion.div
-                      className="absolute inset-0 rounded-full"
-                      style={{ border: '2px solid var(--servari-teal)' }}
-                      animate={{ scale: [1, 1.3, 1.3], opacity: [0.6, 0, 0] }}
-                      transition={{
-                        duration: ringDur,
-                        repeat: Infinity,
-                        ease: "easeOut",
-                        delay: ringDur / 2,
-                      }}
-                    />
-                  </>
-                );
-              })()}
+              {isListening &&
+                (() => {
+                  // ringDur drives the visible feedback per state.
+                  const inConv = voiceMode === "conversation";
+                  const ringDur =
+                    inConv && convState === "transcribing"
+                      ? 0.9 // shimmer — fast
+                      : inConv && convState === "speaking"
+                        ? 3.2 // soft ripple — slow
+                        : 2; // listening / classic — steady
+                  return (
+                    <>
+                      <motion.div
+                        className="absolute inset-0 rounded-full"
+                        style={{ border: "2px solid var(--servari-teal)" }}
+                        animate={{ scale: [1, 1.3, 1.3], opacity: [0.6, 0, 0] }}
+                        transition={{
+                          duration: ringDur,
+                          repeat: Infinity,
+                          ease: "easeOut",
+                        }}
+                      />
+                      <motion.div
+                        className="absolute inset-0 rounded-full"
+                        style={{ border: "2px solid var(--servari-teal)" }}
+                        animate={{ scale: [1, 1.3, 1.3], opacity: [0.6, 0, 0] }}
+                        transition={{
+                          duration: ringDur,
+                          repeat: Infinity,
+                          ease: "easeOut",
+                          delay: ringDur / 2,
+                        }}
+                      />
+                    </>
+                  );
+                })()}
 
               {/* Feather/mic icon */}
-              <svg width="36" height="36" viewBox="0 0 36 36" className="relative z-10">
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 36 36"
+                className="relative z-10"
+              >
                 <path
                   d="M18 4 Q15 10, 13 18 Q15 26, 18 32 Q21 26, 23 18 Q21 10, 18 4 Z M18 4 Q16 8, 10 16 M18 12 Q15 16, 11 20 M18 20 Q16 22, 13 26"
                   fill="none"
-                  stroke={isListening ? 'var(--servari-ivory)' : 'var(--servari-teal)'}
+                  stroke={
+                    isListening ? "var(--servari-ivory)" : "var(--servari-teal)"
+                  }
                   strokeWidth="1.5"
                   strokeLinecap="round"
                 />

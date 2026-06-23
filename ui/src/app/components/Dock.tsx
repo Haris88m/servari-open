@@ -7,7 +7,6 @@ import {
   Users2,
   Network,
   ClipboardList,
-  Rocket,
   Gauge,
   ShieldCheck,
   Heart,
@@ -15,6 +14,11 @@ import {
   Briefcase,
   Building2,
   Cpu,
+  Bot,
+  BarChart3,
+  FileText,
+  Settings2,
+  Workflow,
   Pin,
   PinOff,
 } from "lucide-react";
@@ -47,13 +51,15 @@ const DOCK_GROUPS: DockGroup[] = [
     items: [
       { id: "dashboard", icon: LayoutDashboard, label: "Dashboard", path: "/shell" },
       { id: "chat", icon: MessageSquare, label: "Chat", path: "/shell/chat" },
+      { id: "agent-apps", icon: Bot, label: "Agent Apps", path: "/shell/agent-apps" },
     ],
   },
   {
     label: "WORKSPACE",
     items: [
       { id: "agents", icon: Users2, label: "Agents", path: "/shell/agents" },
-      { id: "org-chart", icon: Network, label: "Org Chart", path: "/shell/org-chart" },
+      { id: "org-chart", icon: Network, label: "Agent Map", path: "/shell/org-chart" },
+      { id: "projects", icon: Workflow, label: "Projects", path: "/shell/projects" },
       { id: "standing-orders", icon: ClipboardList, label: "Standing Orders", path: "/shell/standing-orders" },
     ],
   },
@@ -65,12 +71,14 @@ const DOCK_GROUPS: DockGroup[] = [
       { id: "health", icon: Heart, label: "Health", path: "/shell/health" },
       { id: "engine", icon: Cpu, label: "Runtime", path: "/shell/runtime" },
       { id: "tokens", icon: Coins, label: "Tokens", path: "/shell/tokens" },
-      { id: "launch-arc", icon: Rocket, label: "Launch Arc", path: "/shell/launch-arc" },
+      { id: "settings", icon: Settings2, label: "Settings", path: "/shell/settings" },
     ],
   },
   {
     label: "VENTURES",
     items: [
+      { id: "trading", icon: BarChart3, label: "Trading", path: "/shell/trading" },
+      { id: "cv-builder", icon: FileText, label: "CV Builder", path: "/shell/cv-builder" },
       { id: "company", icon: Building2, label: "The Company", path: "/shell/company" },
       { id: "personal", icon: Briefcase, label: "Personal", path: "/shell/personal" },
     ],

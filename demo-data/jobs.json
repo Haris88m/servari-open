@@ -1,10 +1,17 @@
 {
-  "_doc": "Demo job-board results for the Jobs tab. Synthetic — replace with your own crawl output.",
-  "last_scan": "2026-06-01T09:00:00Z",
+  "_schema": "servari.jobs.v1",
+  "last_scan": "2026-06-20T22:17:28+00:00",
   "jobs": [
-    { "title": "Senior Frontend Engineer", "company": "Acme", "source": "demo-board", "location": "Remote", "score": 92, "posted": "2d", "tailored": true },
-    { "title": "Full-Stack Developer", "company": "Northwind", "source": "demo-board", "location": "Hybrid", "score": 84, "posted": "5d", "tailored": false },
-    { "title": "Platform Engineer", "company": "Helios", "source": "demo-board", "location": "On-site", "score": 78, "posted": "1w", "tailored": false },
-    { "title": "AI Integration Engineer", "company": "Demo CRM", "source": "demo-board", "location": "Remote", "score": 88, "posted": "6h", "tailored": true }
+    {
+      "title": "",
+      "company": "",
+      "source": "manual",
+      "location": "",
+      "score": 0,
+      "posted": "",
+      "tailored": false,
+      "url": "",
+      "notes": ""
+    }
   ]
 }

@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Map trade-risk into SERVARI. Keep sizing safe and gated.","ts":"2026-06-20T02:31:00+00:00"}
+{"turn":2,"from":"trading-risk-manager","text":"Ready: I create risk matrices and paper sizing envelopes only. Any live order, leverage, or broker action is a hard gate.","ts":"2026-06-20T02:32:00+00:00"}

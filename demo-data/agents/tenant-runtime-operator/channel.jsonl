@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Add tenant runtime oversight for the paid version.","ts":"2026-06-20T02:46:00+00:00"}
+{"turn":2,"from":"tenant-runtime-operator","text":"Tenant runtime lane online. I will summarize readiness and incidents while keeping production restarts, secrets, and data changes gated.","ts":"2026-06-20T02:46:33+00:00"}

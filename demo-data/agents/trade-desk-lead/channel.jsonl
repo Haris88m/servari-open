@@ -1,0 +1,3 @@
+{"turn":1,"from":"operator","text":"Stand up the paid trade desk from the local trade-agent source pool. Keep it non-executing and gated.","ts":"2026-06-20T02:31:00+00:00"}
+{"turn":2,"from":"trade-desk-lead","text":"Mapped the trade desk into research, risk, and learning loops. Specialist agents can prepare paper-analysis outputs and trade-intent drafts only.","ts":"2026-06-20T02:32:00+00:00"}
+{"turn":3,"from":"trade-desk-lead","text":"Live order placement remains outside the shipped workspace and requires explicit human approval plus an external broker connector.","ts":"2026-06-20T02:33:00+00:00"}

@@ -1,0 +1,105 @@
+{
+  "_schema": "servari.rss_feeds.v1",
+  "_doc": "Operator-editable RSS/datafeed subscriptions for the OS dashboard and trading desk. YouTube channel feeds are real uploads feeds, not mock data.",
+  "feeds": [
+    {
+      "id": "hn",
+      "label": "Hacker News",
+      "url": "https://hnrss.org/frontpage",
+      "category": "technology",
+      "priority": "medium"
+    },
+    {
+      "id": "github",
+      "label": "GitHub Blog",
+      "url": "https://github.blog/feed/",
+      "category": "engineering",
+      "priority": "medium"
+    },
+    {
+      "id": "bleepingcomputer",
+      "label": "BleepingComputer",
+      "url": "https://www.bleepingcomputer.com/feed/",
+      "category": "security",
+      "priority": "high"
+    },
+    {
+      "id": "aws",
+      "label": "AWS What's New",
+      "url": "https://aws.amazon.com/about-aws/whats-new/recent/feed/",
+      "category": "infrastructure",
+      "priority": "medium"
+    },
+    {
+      "id": "openai",
+      "label": "OpenAI News",
+      "url": "https://openai.com/news/rss.xml",
+      "category": "ai",
+      "priority": "medium"
+    },
+    {
+      "id": "verge-ai",
+      "label": "The Verge AI",
+      "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+      "category": "ai",
+      "priority": "medium"
+    },
+    {
+      "id": "coindesk",
+      "label": "CoinDesk Markets",
+      "url": "https://www.coindesk.com/arc/outboundfeeds/rss/",
+      "category": "markets",
+      "priority": "high"
+    },
+    {
+      "id": "smb-capital-youtube",
+      "label": "SMB Capital YouTube",
+      "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCg3B_joekBGJ1s_4fRjsMKA",
+      "category": "trading-video",
+      "priority": "high",
+      "source_type": "youtube-channel"
+    },
+    {
+      "id": "wsj-markets",
+      "label": "WSJ Markets",
+      "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+      "category": "markets",
+      "priority": "high"
+    },
+    {
+      "id": "cnbc-top-news",
+      "label": "CNBC Top News",
+      "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+      "category": "macro",
+      "priority": "medium"
+    },
+    {
+      "id": "cnbc-markets",
+      "label": "CNBC Markets",
+      "url": "https://www.cnbc.com/id/15839135/device/rss/rss.html",
+      "category": "markets",
+      "priority": "high"
+    },
+    {
+      "id": "yahoo-finance-headlines",
+      "label": "Yahoo Finance Watchlist",
+      "url": "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC,%5EIXIC,BTC-USD&region=US&lang=en-US",
+      "category": "watchlist",
+      "priority": "high"
+    },
+    {
+      "id": "investing-markets",
+      "label": "Investing.com Markets",
+      "url": "https://www.investing.com/rss/news_25.rss",
+      "category": "markets",
+      "priority": "medium"
+    },
+    {
+      "id": "tradingview-feed",
+      "label": "TradingView Feed",
+      "url": "https://www.tradingview.com/feed/",
+      "category": "technical-analysis",
+      "priority": "medium"
+    }
+  ]
+}

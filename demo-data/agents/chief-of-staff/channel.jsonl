@@ -1,0 +1,3 @@
+{"turn":1,"from":"operator","text":"Run the daily local agent loop and route anything that needs an owner.","ts":"2026-06-20T02:26:00+00:00"}
+{"turn":2,"from":"chief-of-staff","text":"Daily loop is active. Intake, cashflow, schedule, and archive checks are assigned; release watch stays with Runtime Watch and Release Manager.","ts":"2026-06-20T02:28:00+00:00"}
+{"turn":3,"from":"chief-of-staff","text":"Current focus: keep approval-gated work visible and make the expanded roster easy to inspect from the Agents view.","ts":"2026-06-20T02:29:00+00:00"}

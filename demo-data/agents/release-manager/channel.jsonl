@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Prepare the release-readiness check for the expanded local agent workspace.","ts":"2026-06-20T02:25:00+00:00"}
+{"turn":2,"from":"release-manager","text":"Release-readiness checklist now includes agents/status shape, workflow lanes, process-table root key, UI build, API smoke, and browser route checks.","ts":"2026-06-20T02:29:00+00:00"}

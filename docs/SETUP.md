@@ -83,8 +83,8 @@ python server/chat_byom.py --check
 python server/servari_server.py
 ```
 
-Open **http://127.0.0.1:8911/**. The dashboard, agent grid, org chart, gates, and
-all panels render from the bundled demo data.
+Open **http://127.0.0.1:8911/**. The dashboard, 51-agent workspace, workflow
+lanes, org chart, gates, and all panels render from the bundled demo data.
 
 > The server binds `127.0.0.1:8911` by default (localhost only) and serves the
 > built SPA plus a JSON API. Both are configurable via environment variables — no
@@ -113,8 +113,11 @@ Build a portable Windows `.exe`:
 npm run build:exe      # -> dist-exe/SERVARI-x64.exe
 ```
 
-The `.exe` is the window only; it starts `server/servari_server.py` at runtime, so
-Python must be on `PATH` (or set `SERVARI_PYTHON` to a specific interpreter).
+The `.exe` is the window/launcher only; it starts `server/servari_server.py` at
+runtime, so Python must be on `PATH` (or set `SERVARI_PYTHON` to a specific
+interpreter). When run from `dist-exe/`, the launcher auto-resolves the repo
+root one directory up. If you move the launcher elsewhere, set `SERVARI_HOME` to
+the folder that contains `server/servari_server.py`.
 
 ## 6. (Optional) Local voice
 
@@ -146,6 +149,11 @@ Re-stamp the time-based demo seeds so the panes look active:
 ```bash
 python demo-data/_seed.py
 ```
+
+To add a local demo agent, add it to `demo-data/agents.json`, create
+`demo-data/agents/<id>/channel.jsonl`, add a matching `START.md`, and optionally
+place it in `demo-data/agent-workflows.json`. The server derives `/api/state`,
+`/api/grid`, and `/api/agents/status` from those files.
 
 ## Troubleshooting
 

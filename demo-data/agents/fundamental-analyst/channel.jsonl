@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Map the trade-fundamental source into a SERVARI paid research agent.","ts":"2026-06-20T02:31:00+00:00"}
+{"turn":2,"from":"fundamental-analyst","text":"Ready: I evaluate provided fundamentals and mark unknown TVL, revenue, liquidity, audit, or team data as missing instead of filling gaps.","ts":"2026-06-20T02:32:00+00:00"}

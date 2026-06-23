@@ -215,7 +215,7 @@ export function TopBar({ activeAppName, onProcessTableClick }: TopBarProps) {
       }}
     >
       {/* ── LEFT (240px) ───────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3" style={{ width: 240 }}>
+      <div className="flex min-w-0 flex-1 items-center gap-2 md:w-[320px] md:flex-none md:gap-3">
         {/* Raven — breathes */}
         <motion.img
           src="/raven.png"
@@ -230,6 +230,7 @@ export function TopBar({ activeAppName, onProcessTableClick }: TopBarProps) {
 
         {/* Wordmark — Playfair, ivory base with teal-glow A + I (SERV A R I) */}
         <span
+          className="shrink-0"
           style={{
             fontFamily: "var(--font-wordmark)",
             fontSize: "var(--t-16)",
@@ -250,6 +251,7 @@ export function TopBar({ activeAppName, onProcessTableClick }: TopBarProps) {
 
         {/* Active app name */}
         <span
+          className="min-w-0 truncate"
           style={{
             color: "var(--s-text-secondary)",
             fontSize: "var(--t-13)",
@@ -263,7 +265,7 @@ export function TopBar({ activeAppName, onProcessTableClick }: TopBarProps) {
 
       {/* ── CENTER (flex-1) ─────────────────────────────────────────────── */}
       <div
-        className="flex items-center gap-3"
+        className="hidden items-center gap-3 md:flex"
         style={{ fontFamily: "var(--font-mono)", fontSize: "var(--t-13)", color: "var(--s-text-secondary)" }}
       >
         {/* Clock */}
@@ -317,9 +319,9 @@ export function TopBar({ activeAppName, onProcessTableClick }: TopBarProps) {
       </div>
 
       {/* ── RIGHT (240px) ──────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 justify-end" style={{ width: 240 }}>
+      <div className="flex shrink-0 items-center justify-end gap-2 md:w-[240px] md:gap-3">
         {/* Health dots — 800ms stagger pulse (sequential, not simultaneous) */}
-        <div className="flex items-center gap-1.5">
+        <div className="hidden items-center gap-1.5 sm:flex">
           {healthDots.map((dot, i) => {
             const active = dot.status === "active";
             return (
@@ -352,6 +354,7 @@ export function TopBar({ activeAppName, onProcessTableClick }: TopBarProps) {
 
         {/* CTX pressure — text badge, no SVG arc */}
         <span
+          className="hidden sm:inline"
           style={{
             fontSize: "var(--t-11)",
             color: pressure.color,

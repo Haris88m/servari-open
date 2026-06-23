@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
-import { Send } from "lucide-react";
-import { API, type ChannelSummary, type Turn } from "../lib/api";
+import { Search, Send } from "lucide-react";
+import { API, type AgentStatusCell, type Turn } from "../lib/api";
 import { sealLabel } from "../lib/display_seal";
 import { AgentGrid } from "./AgentGrid";
+import { AgentWorkflowStrip } from "./AgentWorkflowStrip";
 
 // ---------------------------------------------------------------------------
 // THE AGENTS WINDOW — every agent's chat open at once, the orchestrator on top.
@@ -27,6 +28,7 @@ import { AgentGrid } from "./AgentGrid";
 const BODY_TURNS = 6; // how many recent turns each mini-window shows
 const POLL_MS = 5000; // per-window channel poll interval
 const STAGGER_MS = 650; // gap between each window's poll fire (so they don't all hit at once)
+const MAX_CHAT_WINDOWS = 12;
 
 // Operator-side turn sentinels (the user's own messages).
 function isOperatorTurn(from: string | undefined): boolean {
@@ -49,6 +51,11 @@ function labelFor(name: string): string {
     .replace(/[-_:]/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
   return sealLabel(titled) || titled;
+}
+
+function labelFromStatus(agent: AgentStatusCell): string {
+  const raw = (agent.display_name || agent.id || "").replace(/\s*\([^)]*\)\s*$/, "").trim();
+  return sealLabel(raw) || labelFor(agent.id || raw);
 }
 
 // The latest non-operator turn text from the main channel = the orchestrator's
@@ -329,6 +336,10 @@ function AgentWindow({ meta, index, pollDelayMs, reduce, registerAnchor }: Agent
 
 export function AgentsView() {
   const [agents, setAgents] = useState<AgentMeta[]>([]);
+  const [statusRows, setStatusRows] = useState<AgentStatusCell[]>([]);
+  const [groups, setGroups] = useState<Array<{ id: string; label: string }>>([]);
+  const [query, setQuery] = useState("");
+  const [groupFilter, setGroupFilter] = useState("all");
   const [statusLine, setStatusLine] = useState<string>("");
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -343,21 +354,32 @@ export function AgentsView() {
   const [lines, setLines] = useState<{ name: string; x1: number; y1: number; x2: number; y2: number }[]>([]);
   const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
 
+  const statusToMeta = useCallback((rows: AgentStatusCell[]): AgentMeta[] => {
+    return (rows || [])
+      .map((agent) => {
+        const turns = Number(agent.turns ?? 0);
+        const active = agent.status === "live" || agent.status === "working";
+        return {
+          name: agent.id,
+          label: labelFromStatus(agent),
+          turns,
+          owes: 0,
+          isIdle: !active && turns === 0,
+        };
+      })
+      .sort((a, b) => b.turns - a.turns || a.label.localeCompare(b.label));
+  }, []);
+
   // initial load — the roster + the orchestrator's latest status line.
   useEffect(() => {
     let alive = true;
-    API.state()
-      .then((s) => {
+    Promise.all([API.agentsStatus(), API.state()])
+      .then(([status, s]) => {
         if (!alive) return;
-        const channels = s.channels || {};
-        const list: AgentMeta[] = Object.entries(channels)
-          .map(([name, summary]: [string, ChannelSummary]) => {
-            const turns = Number(summary?.turns ?? 0);
-            const owes = Number(summary?.owes ?? 0);
-            return { name, label: labelFor(name), turns, owes, isIdle: turns === 0 };
-          })
-          .sort((a, b) => b.turns - a.turns);
-        setAgents(list);
+        const rows = status.agents ?? [];
+        setStatusRows(rows);
+        setGroups(status.groups ?? []);
+        setAgents(statusToMeta(rows));
         setStatusLine(latestSystemLine(s.turns ?? []));
         setLoaded(true);
       })
@@ -371,15 +393,51 @@ export function AgentsView() {
     };
   }, []);
 
-  // keep the orchestrator's one-line status fresh (every 5s).
+  // keep the roster + orchestrator one-line status fresh (every 5s).
   useEffect(() => {
     const id = setInterval(() => {
-      API.state()
-        .then((s) => setStatusLine(latestSystemLine(s.turns ?? [])))
+      Promise.all([API.agentsStatus(), API.state()])
+        .then(([status, s]) => {
+          const rows = status.agents ?? [];
+          setStatusRows(rows);
+          setGroups(status.groups ?? []);
+          setAgents(statusToMeta(rows));
+          setStatusLine(latestSystemLine(s.turns ?? []));
+        })
         .catch(() => {});
     }, POLL_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [statusToMeta]);
+
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return statusRows.filter((agent) => {
+      const groupOk = groupFilter === "all" || agent.group === groupFilter;
+      if (!groupOk) return false;
+      if (!q) return true;
+      const haystack = [
+        agent.id,
+        agent.display_name,
+        agent.role ?? "",
+        agent.group ?? "",
+        agent.workflow ?? "",
+        agent.current_task,
+        agent.latest_reply,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [groupFilter, query, statusRows]);
+
+  const filteredAgents = useMemo(() => statusToMeta(filteredRows), [filteredRows, statusToMeta]);
+  const chatAgents = filteredAgents.slice(0, MAX_CHAT_WINDOWS);
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const row of statusRows) counts[row.status] = (counts[row.status] || 0) + 1;
+    return counts;
+  }, [statusRows]);
+  const lineCapReached = filteredAgents.length > MAX_CHAT_WINDOWS;
 
   const registerAnchor = useCallback((name: string, el: HTMLElement | null) => {
     if (el) anchorEls.current.set(name, el);
@@ -429,7 +487,7 @@ export function AgentsView() {
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [loaded, agents, measure]);
+  }, [loaded, chatAgents, measure]);
 
   // a gentle downward-bowed bezier, root → window.
   const linePath = (l: { x1: number; y1: number; x2: number; y2: number }) => {
@@ -613,19 +671,96 @@ export function AgentsView() {
         {/* grid so the operator sees dispatch state at a glance before diving    */}
         {/* into conversation logs.                                              */}
         <section className="relative z-10 mb-8">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-3">
+            <div>
+              <div
+                className="font-mono text-[0.62rem] tracking-widest uppercase"
+                style={{ color: "var(--servari-dimmed)" }}
+              >
+                Agent Workspace
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {["live", "working", "idle", "done", "blocked"].map((status) => (
+                  <span
+                    key={status}
+                    className="rounded-full px-2.5 py-1 font-mono text-[0.58rem] uppercase"
+                    style={{
+                      color: "var(--servari-dimmed)",
+                      border: "1px solid rgba(250,248,243,0.08)",
+                      background: "rgba(250,248,243,0.035)",
+                    }}
+                  >
+                    {status} {statusCounts[status] ?? 0}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+              <label
+                className="flex min-w-0 items-center gap-2 rounded-xl px-3 py-2"
+                style={{
+                  background: "var(--servari-glass)",
+                  border: "1px solid rgba(250,248,243,0.08)",
+                }}
+              >
+                <Search size={14} style={{ color: "var(--servari-dimmed)" }} />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Filter agents"
+                  className="w-full bg-transparent outline-none md:w-48"
+                  style={{ color: "var(--servari-ivory)", fontSize: "0.75rem" }}
+                />
+              </label>
+              <select
+                value={groupFilter}
+                onChange={(event) => setGroupFilter(event.target.value)}
+                className="rounded-xl px-3 py-2 outline-none"
+                style={{
+                  background: "var(--servari-glass)",
+                  border: "1px solid rgba(250,248,243,0.08)",
+                  color: "var(--servari-ivory)",
+                  fontSize: "0.75rem",
+                }}
+              >
+                <option value="all">All groups</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <AgentGrid agents={filteredRows} fetchError={error} ready={loaded} />
+        </section>
+
+        <section className="relative z-10 mb-8">
           <div
             className="font-mono text-[0.62rem] tracking-widest uppercase mb-3"
             style={{ color: "var(--servari-dimmed)" }}
           >
-            Agent Workspace
+            Workflow Lanes
           </div>
-          <AgentGrid />
+          <AgentWorkflowStrip />
         </section>
 
         {/* The grid of agent chat windows */}
-        {agents.length > 0 && (
+        {chatAgents.length > 0 && (
+          <>
+            <div
+              className="relative z-10 mb-3 flex flex-col gap-1 font-mono text-[0.62rem] uppercase md:flex-row md:items-center md:justify-between"
+              style={{ color: "var(--servari-dimmed)" }}
+            >
+              <span>Channel Windows</span>
+              <span>
+                showing {chatAgents.length} of {filteredAgents.length}
+                {lineCapReached ? " - filter to focus channels" : ""}
+              </span>
+            </div>
           <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {agents.map((agent, i) => (
+            {chatAgents.map((agent, i) => (
               <AgentWindow
                 key={agent.name}
                 meta={agent}
@@ -636,6 +771,7 @@ export function AgentsView() {
               />
             ))}
           </div>
+          </>
         )}
       </div>
     </div>

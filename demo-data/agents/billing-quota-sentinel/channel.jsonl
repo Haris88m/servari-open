@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Add billing and quota monitoring to the paid control plane.","ts":"2026-06-20T02:46:00+00:00"}
+{"turn":2,"from":"billing-quota-sentinel","text":"Billing quota lane online. I will surface usage and plan risk while keeping charges, refunds, and pricing promises gated.","ts":"2026-06-20T02:46:29+00:00"}

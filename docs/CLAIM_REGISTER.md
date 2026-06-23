@@ -25,7 +25,7 @@ Labels:
 | C11 | Server routes degrade gracefully instead of crashing on missing modules/data. | PARTIAL | `server/servari_server.py`; route try/except blocks | HTTP smoke tests in `scripts/verify_all.py`; manual route testing | Smoke test covers selected routes, not every possible failure | "Fail-closed/fail-graceful surfaces" | "Cannot crash" |
 | C12 | Bundled demo data is synthetic seed data. | VERIFIED by repository contents | `demo-data/`; `README.md` | Inspect `demo-data/` | Users may replace it with real data locally | "Synthetic demo data included" | "Real customer data included" |
 | C13 | Voice is optional and not required for shell operation. | PARTIAL | `server/voice.py`; `server/voice_neural.py`; `requirements.txt`; docs | Start server without voice packages; routes report unavailable | CI does not validate STT/TTS inference | "Optional local voice skeleton" | "Full local voice production proof" |
-| C14 | Multi-agent workspace surface is present. | VERIFIED as UI/data surface | `ui/`; `demo-data/agents`; `server/servari_server.py` grid/org routes | Build UI; inspect `/api/grid`, `/api/agents`, `/api/org` | Surface/demo channels are not the same as a concurrent execution engine | "Agent workspace surface" | "Public repo ships autonomous swarm execution" |
+| C14 | Multi-agent workspace surface is present. | VERIFIED as UI/data surface | `ui/`; `demo-data/agents.json`; `demo-data/agent-workflows.json`; `demo-data/agents`; `server/servari_server.py` grid/status/workflow/org routes | Build UI; inspect `/api/grid`, `/api/agents/status`, `/api/agent-workflows`, `/api/org` | The 51-agent paid-ready roster, demo channels, and workflow lanes are not the same as a concurrent execution engine | "File-backed local agent workspace surface" | "Public repo ships autonomous swarm execution" |
 | C15 | Concurrent multi-agent execution engine is shipped in this repo. | UNVERIFIED / NOT SHIPPED | None | Not applicable | Roadmap/separate auditable component if added later | "Not shipped in this repo" | "Full swarm engine is public and verified" |
 | C16 | SERVARI is a model. | UNVERIFIED / NOT SHIPPED | None | Not applicable | SERVARI is a shell over a user-chosen model | "BYOM shell" | "New foundation model" |
 | C17 | SERVARI is AGI or beats frontier systems. | UNVERIFIED / NOT CLAIMED | None | Not applicable | Outside project scope | "Agentic OS shell" | "AGI", "beats frontier", "fully sovereign" |
@@ -36,7 +36,7 @@ Labels:
 
 The strongest accurate public claim is:
 
-> SERVARI is an open-source, local-first BYOM agentic OS shell with mechanical autonomy gates, a local runtime control surface, an append-only human verification queue, file-backed state, fail-closed health surfaces, and a metric-gated retention loop.
+> SERVARI is an open-source, local-first BYOM agentic OS shell with mechanical autonomy gates, a local runtime control surface, a 51-agent file-backed local workspace surface, an append-only human verification queue, fail-closed health surfaces, and a metric-gated retention loop.
 
 ## Current public non-claim
 

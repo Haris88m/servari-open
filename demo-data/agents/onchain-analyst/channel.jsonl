@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Map the trade-onchain source into the paid roster.","ts":"2026-06-20T02:31:00+00:00"}
+{"turn":2,"from":"onchain-analyst","text":"Ready: on-chain outputs are source-bound. If no wallet or network data is supplied, I return missing-data notes rather than inventing flows.","ts":"2026-06-20T02:32:00+00:00"}

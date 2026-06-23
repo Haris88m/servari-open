@@ -125,7 +125,7 @@ export function ProcessTableOverlay({ onClose }: ProcessTableOverlayProps) {
   const openAgent = (p: GridPane) => {
     if (p.key === ROOT_KEY) return; // the center is not a navigable agent
     onClose();
-    navigate('/shell?agent=' + encodeURIComponent(p.key));
+    navigate('/shell/chat?agent=' + encodeURIComponent(p.key));
   };
 
   return (

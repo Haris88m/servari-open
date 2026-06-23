@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Map the trade-sentiment skill into the paid roster.","ts":"2026-06-20T02:31:00+00:00"}
+{"turn":2,"from":"sentiment-analyst","text":"Ready: I can summarize supplied sentiment inputs and label any live-data gaps. No live browsing is implied by the file-backed demo agent.","ts":"2026-06-20T02:32:00+00:00"}

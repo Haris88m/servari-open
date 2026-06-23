@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Send } from "lucide-react";
 import { API, type Turn } from "../lib/api";
@@ -64,6 +65,33 @@ function isOperatorTurn(from: string | undefined): boolean {
   return f === "operator" || f === "user";
 }
 
+function routeForCommand(text: string): { path: string; label: string } | null {
+  const clean = text.toLowerCase().replace(/[^\w\s-]/g, " ").replace(/\s+/g, " ").trim();
+  if (!/\b(open|go|show|navigate|launch|switch)\b/.test(clean)) return null;
+  const routes: Array<[RegExp, string, string]> = [
+    [/\b(dashboard|home|os)\b/, "/shell", "Dashboard"],
+    [/\b(chat|conversation)\b/, "/shell/chat", "Chat"],
+    [/\b(agent apps|apps)\b/, "/shell/agent-apps", "Agent Apps"],
+    [/\b(agent map|neural map|org chart|network)\b/, "/shell/org-chart", "Agent Map"],
+    [/\b(agents|agent grid)\b/, "/shell/agents", "Agents"],
+    [/\b(trading|trade desk|markets)\b/, "/shell/trading", "Trading Desk"],
+    [/\b(cv|resume|career builder|cv builder)\b/, "/shell/cv-builder", "CV Builder"],
+    [/\b(projects|project studio|workflows)\b/, "/shell/projects", "Project Studio"],
+    [/\b(settings|model settings|backend)\b/, "/shell/settings", "Settings"],
+    [/\b(runtime|engine)\b/, "/shell/runtime", "Runtime"],
+    [/\b(gates|fast verify|verify)\b/, "/shell/fast-verify", "Fast Verify Gates"],
+    [/\b(autonomy|dials)\b/, "/shell/autonomy-dials", "Autonomy Dials"],
+    [/\b(health|status)\b/, "/shell/health", "Health"],
+    [/\b(tokens|usage)\b/, "/shell/tokens", "Tokens"],
+    [/\b(company)\b/, "/shell/company", "The Company"],
+    [/\b(personal)\b/, "/shell/personal", "Personal"],
+  ];
+  for (const [re, path, label] of routes) {
+    if (re.test(clean)) return { path, label };
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Mini chat bubble
 // ---------------------------------------------------------------------------
@@ -94,9 +122,11 @@ function ChatBubble({ turn, isUser }: { turn: Turn; isUser: boolean }) {
 // ---------------------------------------------------------------------------
 interface GlobalVoiceProps {
   showMiniChat?: boolean;
+  showLauncher?: boolean;
 }
 
-export function GlobalVoice({ showMiniChat = true }: GlobalVoiceProps) {
+export function GlobalVoice({ showMiniChat = true, showLauncher = true }: GlobalVoiceProps) {
+  const navigate = useNavigate();
   const [convState, setConvState] = useState<ConversationState>("idle");
   const [inConversation, setInConversation] = useState(false);
   const [amplitude, setAmplitude] = useState(0);
@@ -242,6 +272,14 @@ export function GlobalVoice({ showMiniChat = true }: GlobalVoiceProps) {
       // Clear the streaming partial text — the final transcription replaces it.
       setPartialText("");
       setLastUserSaid(text);
+      const nav = routeForCommand(text);
+      if (nav) {
+        navigate(nav.path);
+        const reply = `Opening ${nav.label}.`;
+        setLastReply(reply);
+        Voice.conversationSpeak(reply);
+        return;
+      }
       const baseline = await latestSystemTurn();
       if (baseline > lastSpokenTurnRef.current) lastSpokenTurnRef.current = baseline;
       try {
@@ -286,7 +324,7 @@ export function GlobalVoice({ showMiniChat = true }: GlobalVoiceProps) {
       }
       Voice.conversationSpeak(replyText ?? "");
     },
-    [latestSystemTurn, refreshChat],
+    [latestSystemTurn, navigate, refreshChat],
   );
 
   // -------------------------------------------------------------------------
@@ -370,6 +408,14 @@ export function GlobalVoice({ showMiniChat = true }: GlobalVoiceProps) {
     setSending(true);
     setTextInput("");
     try {
+      const nav = routeForCommand(text);
+      if (nav) {
+        navigate(nav.path);
+        setLastUserSaid(text);
+        setLastReply(`Opening ${nav.label}.`);
+        setSending(false);
+        return;
+      }
       await API.say(text);
       // Give the server ~2s to produce a reply, then refresh turns
       setTimeout(() => {
@@ -379,7 +425,7 @@ export function GlobalVoice({ showMiniChat = true }: GlobalVoiceProps) {
     } catch {
       setSending(false);
     }
-  }, [textInput, sending, fetchChatTurns]);
+  }, [textInput, sending, fetchChatTurns, navigate]);
 
   const onTextKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -399,7 +445,7 @@ export function GlobalVoice({ showMiniChat = true }: GlobalVoiceProps) {
   const chatPanelVisible = showMiniChat && chatOpen;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 pointer-events-none">
+    <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2 pointer-events-none">
 
       {/* ------------------------------------------------------------------ */}
       {/* CHAT PANEL — slides up above the orb                               */}
@@ -638,8 +684,9 @@ export function GlobalVoice({ showMiniChat = true }: GlobalVoiceProps) {
       </AnimatePresence>
 
       {/* ------------------------------------------------------------------ */}
-      {/* COLLAPSED MIC BUTTON — present on EVERY screen                     */}
+      {/* COLLAPSED MIC BUTTON — hidden on the dedicated chat route          */}
       {/* ------------------------------------------------------------------ */}
+      {showLauncher && (
       <div className="pointer-events-auto flex items-center gap-2">
         {/* Chat toggle button — opens the panel without starting voice */}
         {showMiniChat && (
@@ -761,6 +808,7 @@ export function GlobalVoice({ showMiniChat = true }: GlobalVoiceProps) {
           </AnimatePresence>
         </motion.button>
       </div>
+      )}
     </div>
   );
 }

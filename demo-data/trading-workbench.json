@@ -1,0 +1,39 @@
+{
+  "_schema": "servari.trading_workbench.v1",
+  "_doc": "Research-only trading workbench state. SERVARI charts, researches, sizes risk, and writes plans; it does not place live broker orders.",
+  "watchlist": [
+    "SPY",
+    "QQQ",
+    "BTCUSD",
+    "ETHUSD",
+    "NVDA",
+    "TSLA"
+  ],
+  "alerts": [],
+  "risk_rules": [
+    {
+      "rule": "Max 1% account risk per trade idea",
+      "limit": "position size must fit stop distance before entry"
+    },
+    {
+      "rule": "No plan, no trade",
+      "limit": "entry, stop, target, invalidation, and catalyst must be written first"
+    },
+    {
+      "rule": "Research-only execution gate",
+      "limit": "SERVARI does not place live broker orders from this workbench"
+    }
+  ],
+  "research_queue": [],
+  "journal": [],
+  "updated_at": "2026-06-21T00:00:00+00:00",
+  "active_symbol": "SPY",
+  "timeframe": "1D",
+  "position_plan": {
+    "account": 10000,
+    "risk_pct": 1,
+    "entry": 0,
+    "stop": 0,
+    "target": 0
+  }
+}

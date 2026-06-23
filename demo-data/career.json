@@ -1,8 +1,13 @@
 {
-  "_doc": "Demo career profile for the Career tab. Synthetic — replace with your own. If you set portfolio_path to a real folder, the file count is derived live.",
-  "name": "Demo User",
-  "headline": "Full-Stack Engineer · AI Tooling",
-  "location": "Remote",
-  "languages": "English, Spanish",
-  "skills": ["TypeScript", "React", "Python", "Node.js", "LLM integration", "CI/CD"]
+  "_schema": "servari.career_profile.v1",
+  "_doc": "Local CV Builder profile. Edit in SERVARI or replace with your own data.",
+  "name": "Operator",
+  "headline": "asd",
+  "summary": "dsa",
+  "location": "asd",
+  "languages": "das",
+  "skills": [
+    "sdaasd"
+  ],
+  "updated_at": "2026-06-20T22:17:28+00:00"
 }

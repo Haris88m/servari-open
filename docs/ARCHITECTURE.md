@@ -126,3 +126,11 @@ stays under your control.
 Synthetic seed data so every panel renders on first run with no backend wired.
 See each module's docstring for the exact shape it expects. `python demo-data/_seed.py`
 re-stamps the time-based seeds so the live panes look "just active".
+
+The local agent workspace is file-backed. `demo-data/agents.json` defines the
+51-agent paid-ready visible roster, `demo-data/agents/<id>/channel.jsonl` stores
+each synthetic channel, `demo-data/agents/<id>/START.md` stores each brief, and
+`demo-data/agent-workflows.json` drives the workflow-lane cards. Trade, legal,
+billing, deploy, publish, and real-send lanes are represented as gated planning
+surfaces; they do not execute broker orders, legal actions, billing changes, or
+production deploys from this public shell.

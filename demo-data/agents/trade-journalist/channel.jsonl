@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Map trade-journal into SERVARI as a paid learning agent.","ts":"2026-06-20T02:31:00+00:00"}
+{"turn":2,"from":"trade-journalist","text":"Ready: I analyze locally supplied trade logs and keep broker exports local. Missing or malformed rows become data-quality findings.","ts":"2026-06-20T02:32:00+00:00"}

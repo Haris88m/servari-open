@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Review the expanded workflow plan for hard-gate risks.","ts":"2026-06-20T02:25:00+00:00"}
+{"turn":2,"from":"gatekeeper","text":"No external action is approved by the roster change. Publish, deploy, merge, spend, real-send, and secret work remain gated.","ts":"2026-06-20T02:29:00+00:00"}

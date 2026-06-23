@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { API, AgentStatusCell } from "../lib/api";
+import { API, type AgentStatusCell } from "../lib/api";
 import { sealLabel } from "../lib/display_seal";
 
 /**
@@ -76,12 +76,20 @@ function relTime(iso: string | null): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-export function AgentGrid() {
-  const [agents, setAgents] = useState<AgentStatusCell[]>([]);
+interface AgentGridProps {
+  agents?: AgentStatusCell[];
+  fetchError?: string | null;
+  ready?: boolean;
+}
+
+export function AgentGrid(props: AgentGridProps = {}) {
+  const controlled = props.agents !== undefined;
+  const [agents, setAgents] = useState<AgentStatusCell[]>(props.agents ?? []);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (controlled) return;
     let alive = true;
 
     const poll = () =>
@@ -104,9 +112,17 @@ export function AgentGrid() {
       alive = false;
       clearInterval(id);
     };
-  }, []);
+  }, [controlled]);
 
-  if (!ready) {
+  useEffect(() => {
+    if (!controlled) return;
+    setAgents(props.agents ?? []);
+  }, [controlled, props.agents]);
+
+  const actualReady = controlled ? (props.ready ?? true) : ready;
+  const actualError = controlled ? (props.fetchError ?? null) : fetchError;
+
+  if (!actualReady) {
     return (
       <div
         className="font-mono text-[0.65rem] py-3 text-center"
@@ -117,13 +133,13 @@ export function AgentGrid() {
     );
   }
 
-  if (fetchError && agents.length === 0) {
+  if (actualError && agents.length === 0) {
     return (
       <div
         className="rounded-lg px-3 py-2 font-mono text-[0.65rem]"
         style={{ color: "var(--servari-dimmed)", border: "1px solid rgba(248,81,73,0.18)" }}
       >
-        agent status surface offline — {fetchError}
+        agent status surface offline - {actualError}
       </div>
     );
   }

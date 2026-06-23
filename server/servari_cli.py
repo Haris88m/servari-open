@@ -300,9 +300,11 @@ def detect(home: Path | None = None) -> dict:
         "reason": st.get("reason", ""),
     }
 
-    # Recommendation: explicit config wins; else claude > codex > api by PATH.
+    # Recommendation: explicit ready config wins; else configured API, then local CLIs.
     if configured and _backend_ready(configured, claude_path, codex_path, api_info):
         recommended = configured
+    elif api_info.get("available"):
+        recommended = "api"
     elif claude_path:
         recommended = "claude"
     elif codex_path:

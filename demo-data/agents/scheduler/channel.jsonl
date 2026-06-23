@@ -1,2 +1,2 @@
-{"turn": 1, "from": "user", "text": "What's queued for today?", "ts": "2026-06-02T12:01:54+00:00"}
-{"turn": 2, "from": "scheduler", "text": "Two items: finish the settings page (in progress) and the weekly report (not started). Nothing is overdue.", "ts": "2026-06-02T12:01:54+00:00"}
+{"turn":1,"from":"operator","text":"What's queued for today?","ts":"2026-06-20T00:29:00+00:00"}
+{"turn":2,"from":"scheduler","text":"Two items: finish the settings page and the weekly report. Nothing is overdue.","ts":"2026-06-20T00:31:00+00:00"}

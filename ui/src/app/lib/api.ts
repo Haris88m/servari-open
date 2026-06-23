@@ -124,6 +124,188 @@ export interface AgentBriefResponse {
   [k: string]: unknown;
 }
 
+export interface ModelProviderStatus {
+  id: string;
+  label: string;
+  available: boolean;
+  runnable?: boolean;
+  enabled?: boolean;
+  binary?: string;
+  path?: string | null;
+  status?: unknown;
+}
+
+export interface ModelConfigResponse {
+  ok: boolean;
+  config: {
+    backend?: string;
+    provider?: string;
+    base_url?: string;
+    model?: string;
+    workspace_home?: string;
+    api_key_env?: string;
+    theme?: string;
+    has_key?: boolean;
+    key_source?: string;
+    cli?: Record<string, { enabled?: boolean; binary?: string; one_shot_args?: string[]; custom_one_shot?: boolean }>;
+    [k: string]: unknown;
+  };
+  selected_backend: string;
+  effective_backend: string;
+  api?: unknown;
+  cli?: Record<string, ModelProviderStatus>;
+  providers: ModelProviderStatus[];
+  workspace_home?: string;
+  saved?: boolean;
+  error?: string;
+}
+
+export interface GatewayStatus {
+  id: string;
+  label: string;
+  binary?: string;
+  path?: string | null;
+  installed?: boolean;
+  running?: boolean;
+  managed?: boolean;
+  pid?: number | null;
+  port?: number | null;
+  log?: string;
+  status?: unknown;
+  error?: string;
+}
+
+export interface GatewaysResponse {
+  ok: boolean;
+  mode?: string;
+  gateways: GatewayStatus[];
+  running?: number;
+  updated_at?: string;
+  error?: string;
+}
+
+
+export interface ObsidianVaultResponse {
+  ok: boolean;
+  path: string;
+  exists?: boolean;
+  notes?: number;
+  uri?: string;
+  synced?: boolean;
+  opened?: string;
+  updated_at?: string;
+  error?: string;
+}
+
+export interface AgentMapNode {
+  id: string;
+  type?: "agent" | "memory" | string;
+  label: string;
+  name: string;
+  role: string;
+  group: string;
+  workflow?: string;
+  reports_to?: string | null;
+  status: string;
+  current_task: string;
+  latest_reply: string;
+  latest_reply_ts: string | null;
+  turns: number;
+  channel_exists: boolean;
+  runtime_backend?: string;
+  dashboard_ids?: string[];
+  editable?: boolean;
+  source_label?: string;
+  has_source?: boolean;
+  memory_files?: Array<{ label?: string; path?: string; exists?: boolean }>;
+}
+
+export interface AgentMapEdge {
+  id: string;
+  source: string;
+  target: string;
+  kind: "reports_to" | "workflow" | string;
+}
+
+export interface AgentMapResponse {
+  agents: AgentMapNode[];
+  edges: AgentMapEdge[];
+  groups: Array<{ id: string; label: string; count?: number }>;
+  workflows: unknown[];
+  dashboards?: Array<{ id: string; label: string }>;
+  updated_at?: string;
+  error?: string;
+}
+
+export interface AgentProfileResponse {
+  ok: boolean;
+  profile: Partial<AgentMapNode> & { channel?: string } | null;
+  brief?: AgentBriefResponse;
+  error?: string;
+}
+
+export interface RssFeedItem {
+  id?: string;
+  title: string;
+  source?: string;
+  url?: string;
+  published_at?: string;
+  category?: string;
+  summary?: string;
+  priority?: string;
+}
+
+export interface RssFeedsResponse {
+  ok?: boolean;
+  items: RssFeedItem[];
+  feeds?: unknown[];
+  errors?: unknown[];
+  last_sync?: string;
+  error?: string;
+}
+
+export interface LocalStoreRow {
+  id: string;
+  name: string;
+  kind: string;
+  path: string;
+  rows?: number | null;
+  size_mb?: number;
+  updated?: string;
+  status?: string;
+  description?: string;
+}
+
+export interface LocalStoresResponse {
+  ok?: boolean;
+  stores: LocalStoreRow[];
+  last_scan?: string;
+  error?: string;
+}
+
+export interface AgentWorkflowStep {
+  id: string;
+  label: string;
+  owner: string;
+  state: "ready" | "working" | "review" | "blocked" | "done" | string;
+  summary: string;
+  gate?: string;
+}
+
+export interface AgentWorkflow {
+  id: string;
+  title: string;
+  status: string;
+  current_step?: string;
+  steps: AgentWorkflowStep[];
+}
+
+export interface AgentWorkflowsResponse {
+  workflows: AgentWorkflow[];
+  source?: string;
+  note?: string;
+}
+
 export interface AutonomyResponse {
   levels: Record<string, number | string>;
   definitions: Record<string, { name: string; [k: string]: unknown }>;
@@ -236,6 +418,8 @@ export interface JobRow {
   score: number;
   posted: string;
   tailored?: boolean;
+  url?: string;
+  notes?: string;
 }
 
 export interface JobsResponse {
@@ -250,6 +434,7 @@ export interface AppRow {
   status: string;
   date: string;
   url?: string;
+  notes?: string;
 }
 
 export interface ApplicationsResponse {
@@ -260,6 +445,7 @@ export interface ApplicationsResponse {
 export interface CareerProfile {
   name?: string;
   headline?: string;
+  summary?: string;
   location?: string;
   languages?: string;
   portfolio_path?: string;
@@ -333,16 +519,35 @@ export interface AgentStatusCell {
   latest_reply: string;
   latest_reply_ts: string | null;
   channel_exists: boolean;
+  role?: string;
+  group?: string;
+  workflow?: string;
+  turns?: number;
 }
 
 export interface AgentsStatusResponse {
   status: string;
   agents: AgentStatusCell[];
+  groups?: Array<{ id: string; label: string }>;
   error?: string;
 }
 
 export interface ActionsResponse {
   actions: string[];
+  orders?: StandingOrder[];
+}
+
+export interface StandingOrder {
+  id: string;
+  action: string;
+  title: string;
+  purpose: string;
+  owner: string;
+  trigger: string;
+  gate: string;
+  enabled: boolean;
+  last_run?: string;
+  last_ok?: boolean | null;
 }
 
 export interface RunResponse {
@@ -425,21 +630,52 @@ export interface VoiceTranscribeResponse {
 // Low-level fetch helpers.
 // ---------------------------------------------------------------------------
 
+async function readJSON<T>(res: Response, path: string): Promise<T> {
+  const text = await res.text();
+  let data: unknown = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`${path} returned non-JSON response`);
+    }
+  }
+  if (!res.ok) {
+    const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
+    throw new Error(String(record.error || `${path} failed with HTTP ${res.status}`));
+  }
+  return data as T;
+}
+
+export interface TradingWorkbenchResponse {
+  ok?: boolean;
+  active_symbol?: string;
+  timeframe?: string;
+  position_plan?: Record<string, unknown>;
+  watchlist: string[];
+  alerts: Array<Record<string, unknown>>;
+  risk_rules: Array<Record<string, unknown>>;
+  research_queue: Array<Record<string, unknown>>;
+  journal: Array<Record<string, unknown>>;
+  updated_at?: string;
+  error?: string;
+}
+
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(path, {
     method: 'GET',
     headers: { Accept: 'application/json' },
   });
-  return (await res.json()) as T;
+  return readJSON<T>(res, path);
 }
 
 async function postJSON<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-SERVARI-Client': 'app' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  return (await res.json()) as T;
+  return readJSON<T>(res, path);
 }
 
 function qs(params: Record<string, string | number | undefined>): string {
@@ -484,6 +720,60 @@ export const API = {
   },
   agentBrief(name: string): Promise<AgentBriefResponse> {
     return getJSON<AgentBriefResponse>(`/api/agent-brief${qs({ name })}`);
+  },
+  saveAgentBrief(name: string, brief: string): Promise<OkResponse> {
+    return postJSON<OkResponse>('/api/agent-brief', { name, brief });
+  },
+  agentProfile(name: string): Promise<AgentProfileResponse> {
+    return getJSON<AgentProfileResponse>(`/api/agent-profile${qs({ name })}`);
+  },
+  saveAgentProfile(profile: Record<string, unknown>): Promise<OkResponse> {
+    return postJSON<OkResponse>('/api/agent-profile', profile);
+  },
+  agentMap(): Promise<AgentMapResponse> {
+    return getJSON<AgentMapResponse>('/api/agent-map');
+  },
+  agentWorkflows(): Promise<AgentWorkflowsResponse> {
+    return getJSON<AgentWorkflowsResponse>('/api/agent-workflows');
+  },
+  modelConfig(): Promise<ModelConfigResponse> {
+    return getJSON<ModelConfigResponse>('/api/model-config');
+  },
+  saveModelConfig(config: Record<string, unknown>): Promise<ModelConfigResponse> {
+    return postJSON<ModelConfigResponse>('/api/model-config', config);
+  },
+  setModelSecret(action: 'set' | 'clear', apiKey = ''): Promise<OkResponse> {
+    return postJSON<OkResponse>('/api/settings/model-backend/secret', { action, api_key: apiKey });
+  },
+  testModelBackend(text?: string, backend?: string): Promise<OkResponse> {
+    return postJSON<OkResponse>('/api/settings/model-backend/test', { text, backend });
+  },
+  gateways(): Promise<GatewaysResponse> {
+    return getJSON<GatewaysResponse>('/api/gateways');
+  },
+  gatewayAction(gateway: string, action: 'status' | 'start' | 'stop' | 'restart'): Promise<OkResponse> {
+    return postJSON<OkResponse>('/api/gateways/action', { gateway, action });
+  },
+  cliProviderAction(provider: string, action: 'session' | 'login' | 'configure' | 'dashboard' | 'doctor'): Promise<OkResponse> {
+    return postJSON<OkResponse>('/api/cli-provider/action', { provider, action });
+  },
+  obsidianVault(): Promise<ObsidianVaultResponse> {
+    return getJSON<ObsidianVaultResponse>('/api/obsidian-vault');
+  },
+  obsidianAction(action: 'status' | 'sync' | 'open-folder' | 'open-obsidian'): Promise<ObsidianVaultResponse> {
+    return postJSON<ObsidianVaultResponse>('/api/obsidian-vault/action', { action });
+  },
+  rssFeeds(): Promise<RssFeedsResponse> {
+    return getJSON<RssFeedsResponse>('/api/rss-feeds');
+  },
+  tradingWorkbench(): Promise<TradingWorkbenchResponse> {
+    return getJSON<TradingWorkbenchResponse>('/api/trading-workbench');
+  },
+  saveTradingWorkbench(payload: Partial<TradingWorkbenchResponse>): Promise<TradingWorkbenchResponse> {
+    return postJSON<TradingWorkbenchResponse>('/api/trading-workbench', payload);
+  },
+  localStores(): Promise<LocalStoresResponse> {
+    return getJSON<LocalStoresResponse>('/api/local-stores');
   },
 
   // --- autonomy dials ---
@@ -541,11 +831,20 @@ export const API = {
   jobs(): Promise<JobsResponse> {
     return getJSON<JobsResponse>('/api/jobs');
   },
+  saveJobs(payload: JobsResponse): Promise<JobsResponse & OkResponse> {
+    return postJSON<JobsResponse & OkResponse>('/api/jobs', payload);
+  },
   applications(): Promise<ApplicationsResponse> {
     return getJSON<ApplicationsResponse>('/api/applications');
   },
+  saveApplications(payload: ApplicationsResponse): Promise<ApplicationsResponse & OkResponse> {
+    return postJSON<ApplicationsResponse & OkResponse>('/api/applications', payload);
+  },
   career(): Promise<CareerProfile> {
     return getJSON<CareerProfile>('/api/career');
+  },
+  saveCareer(payload: CareerProfile): Promise<{ ok: boolean; profile?: CareerProfile; error?: string }> {
+    return postJSON<{ ok: boolean; profile?: CareerProfile; error?: string }>('/api/career', payload);
   },
   inbox(): Promise<InboxResponse> {
     return getJSON<InboxResponse>('/api/inbox');

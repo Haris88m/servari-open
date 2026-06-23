@@ -1,0 +1,89 @@
+{
+  "orders": [
+    {
+      "id": "agent-registry-audit",
+      "action": "agent-registry-audit",
+      "title": "Agent Registry Audit",
+      "purpose": "Verify graph edges, profile ids, and local agent registry consistency.",
+      "owner": "Staff Architect",
+      "trigger": "manual",
+      "gate": "read-only local audit",
+      "enabled": true,
+      "last_run": "2026-06-20T13:53:46+00:00",
+      "last_ok": true
+    },
+    {
+      "id": "disk-free",
+      "action": "disk-free",
+      "title": "Disk Capacity Check",
+      "purpose": "Check available storage for local models, voice caches, builds, and exports.",
+      "owner": "Runtime Watch",
+      "trigger": "manual",
+      "gate": "read-only filesystem stat",
+      "enabled": true,
+      "last_run": "",
+      "last_ok": null
+    },
+    {
+      "id": "model-gateway-status",
+      "action": "model-gateway-status",
+      "title": "Model And Gateway Status",
+      "purpose": "Inspect selected backend, CLI availability, and Hermes/OpenClaw gateway reachability.",
+      "owner": "Runtime Watch",
+      "trigger": "manual",
+      "gate": "read-only readiness probes",
+      "enabled": true,
+      "last_run": "2026-06-20T14:19:26+00:00",
+      "last_ok": true
+    },
+    {
+      "id": "public-verification",
+      "action": "public-verification",
+      "title": "Run Public Verification",
+      "purpose": "Execute SERVARI's bundled regression harness and print the report tail.",
+      "owner": "QA Security Sentinel",
+      "trigger": "manual",
+      "gate": "bounded local verification script",
+      "enabled": true,
+      "last_run": "",
+      "last_ok": null
+    },
+    {
+      "id": "python-version",
+      "action": "python-version",
+      "title": "Python Runtime Check",
+      "purpose": "Confirm the Python interpreter used by SERVARI server-side tools.",
+      "owner": "Runtime Watch",
+      "trigger": "manual",
+      "gate": "read-only runtime introspection",
+      "enabled": true,
+      "last_run": "2026-06-20T13:53:43+00:00",
+      "last_ok": true
+    },
+    {
+      "id": "rss-refresh",
+      "action": "rss-refresh",
+      "title": "Refresh RSS Datafeeds",
+      "purpose": "Clear the RSS cache and fetch the current dashboard signal feeds.",
+      "owner": "Communications Agent",
+      "trigger": "manual",
+      "gate": "network read only",
+      "enabled": true,
+      "last_run": "",
+      "last_ok": null
+    },
+    {
+      "id": "workspace-health",
+      "action": "workspace-health",
+      "title": "Workspace Health Snapshot",
+      "purpose": "Summarize registered agents, channels, START.md files, and local stores.",
+      "owner": "Chief of Staff",
+      "trigger": "manual",
+      "gate": "read-only local audit",
+      "enabled": true,
+      "last_run": "",
+      "last_ok": null
+    }
+  ],
+  "updated_at": "2026-06-20T14:19:26+00:00"
+}

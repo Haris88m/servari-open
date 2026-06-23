@@ -1,5 +1,5 @@
 {
-  "_doc": "Demo memory registry for /api/memory-surface. Declares which files the Memory surface lists. Each row: {file (display name), path (relative to home)}. The mtime + heading count are derived live from disk.",
+  "_doc": "Local memory registry for /api/memory-surface. Declares which files the Memory surface lists. Each row: {file (display name), path (relative to home)}. The mtime + heading count are derived live from disk.",
   "files": [
     { "file": "notes.md", "path": "demo-data/memory/notes.md" },
     { "file": "decisions.md", "path": "demo-data/memory/decisions.md" },

@@ -83,18 +83,25 @@ def load_config() -> dict:
 
 
 def is_configured() -> dict:
-    """Report whether a model is wired. {ok, model, base_url, has_key, reason}."""
+    """Report whether a model is wired without exposing credential material."""
     cfg = load_config()
     model = (cfg.get("model") or "").strip()
     base = (cfg.get("base_url") or "").strip()
-    key = (cfg.get("api_key") or "").strip()
+    env_name = (cfg.get("api_key_env") or "").strip()
+    env_key = os.environ.get(env_name, "").strip() if env_name else ""
+    file_key = (cfg.get("api_key") or "").strip()
+    key_source = f"env:{env_name}" if env_key else ("config.json" if file_key else "")
+    has_key = bool(env_key or file_key)
     if not _config_path().is_file():
         return {"ok": False, "model": "", "base_url": "", "has_key": False,
+                "key_source": "",
                 "reason": "config.json not found — copy config.example.json to config.json and fill it in."}
     if not base or not model:
-        return {"ok": False, "model": model, "base_url": base, "has_key": bool(key),
+        return {"ok": False, "model": model, "base_url": base, "has_key": has_key,
+                "key_source": key_source,
                 "reason": "config.json is missing base_url and/or model."}
-    return {"ok": True, "model": model, "base_url": base, "has_key": bool(key),
+    return {"ok": True, "model": model, "base_url": base, "has_key": has_key,
+            "key_source": key_source,
             "reason": "configured"}
 
 
@@ -119,6 +126,8 @@ def _to_messages(history, system: str | None = None) -> list:
     if isinstance(history, list):
         for turn in history[-20:]:  # cap context to the last 20 turns
             if not isinstance(turn, dict):
+                continue
+            if turn.get("error"):
                 continue
             text = str(turn.get("text", "")).strip()
             if not text:
@@ -152,7 +161,8 @@ def reply(history, system: str | None = None) -> dict:
 
     base = status["base_url"].rstrip("/")
     model = status["model"]
-    key = (cfg.get("api_key") or "").strip()
+    env_name = (cfg.get("api_key_env") or "").strip()
+    key = (os.environ.get(env_name, "").strip() if env_name else "") or (cfg.get("api_key") or "").strip()
     url = base + "/chat/completions"
 
     payload = json.dumps({

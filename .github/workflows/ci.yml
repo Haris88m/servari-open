@@ -2,9 +2,9 @@ name: SERVARI verification
 
 on:
   push:
-    branches: [ master, release/** ]
+    branches: [master, release/**]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 permissions:
   contents: read
@@ -20,10 +20,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Run one-command verification
         run: python scripts/verify_all.py
+
+      - name: BYOM end-to-end smoke test
+        run: python tests/byom_smoke.py
 
       - name: Upload verification report
         if: always()
@@ -43,7 +46,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install UI dependencies
         working-directory: ui
@@ -61,3 +64,85 @@ jobs:
       - name: Audit production UI dependencies
         working-directory: ui
         run: npm audit --omit=dev
+
+  playwright-qa:
+    name: Playwright QA (non-blocking)
+    runs-on: ubuntu-latest
+    # Non-blocking: the high-value gate is byom_smoke in python-verification.
+    # A full browser run can be heavy/flaky in CI, so failures here do not fail the workflow.
+    continue-on-error: true
+    env:
+      SERVARI_QA_BASE: http://127.0.0.1:8998
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build UI
+        working-directory: ui
+        run: npm run build
+
+      - name: Install root dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Start SERVARI server
+        run: |
+          python server/servari_server.py &
+          echo "SERVARI_PID=$!" >> "$GITHUB_ENV"
+        env:
+          SERVARI_PORT: "8998"
+
+      - name: Wait for server to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8998/ >/dev/null; then
+              echo "server up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "server did not become ready" >&2
+          exit 1
+
+      - name: Run Playwright QA spec
+        run: npx playwright test tests/servari-qa.spec.js
+
+      - name: Stop SERVARI server
+        if: always()
+        run: |
+          if [ -n "${SERVARI_PID:-}" ]; then
+            kill "$SERVARI_PID" || true
+          fi
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: test-results/
+          if-no-files-found: ignore

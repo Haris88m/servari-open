@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Add a paid-version tenant onboarding control-plane agent.","ts":"2026-06-20T02:46:00+00:00"}
+{"turn":2,"from":"tenant-onboarding-operator","text":"Tenant onboarding lane online. I will map setup steps and keep account creation, access, and billing changes gated.","ts":"2026-06-20T02:46:25+00:00"}

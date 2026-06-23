@@ -8,6 +8,7 @@ import { AmbientBackground } from "./AmbientBackground";
 import { BackgroundFX } from "./BackgroundFX";
 import { FocusMode } from "./FocusMode";
 import { GlobalVoice } from "./GlobalVoice";
+import { API } from "../lib/api";
 
 // Stage transition: old stage fades + slides 12px down on the way out,
 // new stage fades + slides up on the way in. Custom ease, never linear.
@@ -40,15 +41,35 @@ export function Shell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [navigate]);
 
+  useEffect(() => {
+    let alive = true;
+    API.modelConfig()
+      .then((cfg) => {
+        if (!alive) return;
+        const rawTheme = String(cfg.config?.theme || "default");
+        const theme = rawTheme === "graphite" || rawTheme === "ember" ? rawTheme : "default";
+        document.documentElement.setAttribute("data-servari-theme", theme === "default" ? "" : theme);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const outlet = useOutlet();
 
   const getActiveAppName = () => {
     const path = location.pathname;
     if (path === "/shell" || path === "/shell/") return "DASHBOARD";
     if (path.includes("chat")) return "CHAT";
+    if (path.includes("agent-apps")) return "AGENT APPS";
+    if (path.includes("trading")) return "TRADING";
+    if (path.includes("cv-builder")) return "CV BUILDER";
+    if (path.includes("projects")) return "PROJECTS";
+    if (path.includes("settings")) return "SETTINGS";
     if (path.includes("agents")) return "AGENTS";
     if (path.includes("company")) return "THE COMPANY";
-    if (path.includes("org-chart")) return "ORG CHART";
+    if (path.includes("org-chart")) return "AGENT MAP";
     if (path.includes("standing-orders")) return "STANDING ORDERS";
     if (path.includes("launch-arc")) return "LAUNCH ARC";
     if (path.includes("engine") || path.includes("runtime")) return "RUNTIME";
@@ -115,7 +136,7 @@ export function Shell() {
       </div>
 
       {/* GLOBAL VOICE â€” survives navigation */}
-      <GlobalVoice showMiniChat={!isChatRoute} />
+      <GlobalVoice showMiniChat={!isChatRoute} showLauncher={!isChatRoute} />
 
       {/* Process Table Overlay */}
       {isProcessTableOpen && (

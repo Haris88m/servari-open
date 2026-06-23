@@ -21,10 +21,21 @@ Use this checklist before tagging or announcing a public SERVARI release.
 ## Verification
 
 - [ ] `python scripts/verify_all.py` passes locally.
+- [ ] `python tests/byom_smoke.py` passes locally.
+- [ ] `python server/retention.py --self-test` passes locally.
 - [ ] The UI builds locally:
   - [ ] `cd ui`
-  - [ ] `npm install`
+  - [ ] `npm ci`
   - [ ] `npm run build`
+- [ ] Root Electron dependencies install from lockfile:
+  - [ ] `npm ci`
+- [ ] Root and UI production audits report zero vulnerabilities:
+  - [ ] `npm audit --omit=dev`
+  - [ ] `cd ui && npm audit --omit=dev`
+- [ ] Portable launcher builds:
+  - [ ] `npm run build:exe`
+- [ ] Packaged launcher smoke passes from `dist-exe/` without `SERVARI_HOME`.
+- [ ] `dist-exe/SERVARI-x64.sha256` is regenerated for the exact release artifact.
 - [ ] GitHub Actions `python-verification` passes.
 - [ ] GitHub Actions `ui-build` passes.
 - [ ] `verification/last-run.json` is generated locally but not committed.

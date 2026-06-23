@@ -232,7 +232,7 @@ export function Company() {
               >
                 <motion.div
                   className="relative p-6 rounded-xl cursor-pointer overflow-hidden"
-                  onClick={() => navigate('/shell?agent=' + encodeURIComponent(agent.name))}
+                  onClick={() => navigate('/shell/chat?agent=' + encodeURIComponent(agent.name))}
                   initial={{ boxShadow: '0 0 0 0 rgba(20,156,150,0)' }}
                   whileHover={{
                     boxShadow: isIdle
@@ -347,7 +347,7 @@ export function Company() {
                   <motion.button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate('/shell?agent=' + encodeURIComponent(agent.name));
+                      navigate('/shell/chat?agent=' + encodeURIComponent(agent.name));
                     }}
                     whileHover={{ scale: 1.02, backgroundColor: 'rgba(20,156,150,0.08)' }}
                     whileTap={{ scale: 0.98 }}

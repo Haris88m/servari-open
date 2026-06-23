@@ -118,6 +118,31 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+:root[data-servari-theme="graphite"] {
+  --servari-ink: #101114;
+  --servari-panel: #17191F;
+  --servari-edge-1: #2A2E36;
+  --servari-edge-2: #363B45;
+  --servari-teal: #7AC7A7;
+  --servari-teal-dark: #4D9B81;
+  --servari-teal-soft: #A8D7C4;
+  --servari-amber: #DDB66A;
+  --servari-glass: rgba(23, 25, 31, 0.62);
+}
+
+:root[data-servari-theme="ember"] {
+  --servari-ink: #141113;
+  --servari-panel: #1C1718;
+  --servari-edge-1: #34282A;
+  --servari-edge-2: #443337;
+  --servari-teal: #2EA6A0;
+  --servari-teal-dark: #237F7A;
+  --servari-teal-soft: #79C7C2;
+  --servari-amber: #F0B458;
+  --servari-red: #FF6B5F;
+  --servari-glass: rgba(28, 23, 24, 0.64);
+}
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

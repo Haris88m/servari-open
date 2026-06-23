@@ -1,17 +1,28 @@
 {
   "_doc": "BYOM (bring-your-own-model) config. Copy this file to config.json (gitignored) and fill it in. SERVARI never ships a key.",
   "provider": "openai-compatible",
+  "api_key_env": "OPENAI_API_KEY",
   "api_key": "",
   "model": "gpt-4o-mini",
   "base_url": "https://api.openai.com/v1",
-  "backend": "api",
+  "backend": "auto",
   "workspace_home": "",
+  "theme": "default",
+  "cli": {
+    "codex": { "enabled": true, "binary": "codex" },
+    "claude": { "enabled": true, "binary": "claude" },
+    "hermes": { "enabled": true, "binary": "hermes", "one_shot_args": ["--oneshot", "{prompt}"] },
+    "openclaw": { "enabled": true, "binary": "openclaw", "one_shot_args": ["agent", "--local", "--json", "--agent", "main", "--message", "{prompt}"] }
+  },
   "_notes": {
     "provider": "A label for your own reference (e.g. 'openai', 'anthropic', 'ollama', 'openrouter'). The chat backend speaks the OpenAI-compatible /chat/completions shape, which most providers (and Ollama, LM Studio, vLLM, OpenRouter, Together, etc.) expose.",
     "base_url": "The provider's API base. Examples — OpenAI: https://api.openai.com/v1 · Ollama (local): http://127.0.0.1:11434/v1 · OpenRouter: https://openrouter.ai/api/v1 · LM Studio (local): http://127.0.0.1:1234/v1",
     "model": "The model id at that provider (e.g. 'gpt-4o-mini', 'llama3.1:8b', 'meta-llama/llama-3.1-8b-instruct').",
-    "api_key": "Leave empty for keyless local servers (Ollama / LM Studio). Required for hosted providers.",
-    "backend": "Optional default terminal backend: api, claude, or codex.",
-    "workspace_home": "Optional local workspace for Claude/Codex launches. If it contains AGENTS.md, the harness boots from that file. Keep private paths in your local config.json or SERVARI_WORKSPACE_HOME, never in source."
+    "api_key_env": "Preferred secret source. If this environment variable exists, SERVARI uses it before api_key.",
+    "api_key": "Write-only fallback for local config.json. Leave empty for keyless local servers (Ollama / LM Studio). The settings API never returns this value.",
+    "backend": "auto, api, codex, claude, hermes, or openclaw. auto prefers a configured API, then runnable local CLIs.",
+    "workspace_home": "Optional local workspace for CLI providers. If it contains AGENTS.md, the harness boots from that file. Keep private paths in your local config.json or SERVARI_WORKSPACE_HOME, never in source.",
+    "theme": "default, graphite, or ember.",
+    "cli": "Codex and Claude have built-in one-shot runners. Hermes/OpenClaw default to their non-interactive local CLI modes and can be customized with one_shot_args."
   }
 }

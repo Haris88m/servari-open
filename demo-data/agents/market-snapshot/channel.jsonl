@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Prepare the fast snapshot role from the trade-quick source skill.","ts":"2026-06-20T02:31:00+00:00"}
+{"turn":2,"from":"market-snapshot","text":"Ready: I produce a 60-second-style market read from provided symbols and mark all output as research or paper context, never an order.","ts":"2026-06-20T02:32:00+00:00"}

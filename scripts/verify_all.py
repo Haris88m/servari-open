@@ -47,10 +47,13 @@ TEST_HOME = ROOT / "verification" / "_verify_home"
 TEST_PORT = 8921
 
 EXPECTED_ACTIONS = {
-    "echo-hello",
-    "list-demo-agents",
+    "agent-registry-audit",
     "disk-free",
+    "model-gateway-status",
     "python-version",
+    "public-verification",
+    "rss-refresh",
+    "workspace-health",
 }
 
 

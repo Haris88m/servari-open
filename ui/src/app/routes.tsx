@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate } from "react-router";
 import { Shell } from "./components/Shell";
 import { BootSequence } from "./components/BootSequence";
 import { ChatStage } from "./components/ChatStage";
-import { DashboardView } from "./components/DashboardView";
+import { OsDashboard as DashboardView } from "./components/OsDashboard";
 import { Company } from "./components/Company";
 import { OrgChart } from "./components/OrgChart";
 import { StandingOrders } from "./components/StandingOrders";
@@ -16,6 +16,11 @@ import { Health } from "./components/Health";
 import { TokensPanel } from "./components/TokensPanel";
 import { PersonalView } from "./components/PersonalView";
 import { EngineRuntimeView } from "./components/EngineRuntimeView";
+import { AgentApps } from "./components/AgentApps";
+import { TradingDesk } from "./components/TradingDesk";
+import { CvBuilder } from "./components/CvBuilder";
+import { ModelSettingsView } from "./components/ModelSettingsView";
+import { ProjectsWorkbench } from "./components/ProjectsWorkbench";
 
 // AgentsView is lazy-loaded so this route file compiles even if the module
 // lands slightly later in the build.
@@ -46,6 +51,11 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <DashboardView /> },
       { path: "chat", element: <ChatStage /> },
+      { path: "agent-apps", element: <AgentApps /> },
+      { path: "trading", element: <TradingDesk /> },
+      { path: "cv-builder", element: <CvBuilder /> },
+      { path: "projects", element: <ProjectsWorkbench /> },
+      { path: "settings", element: <ModelSettingsView /> },
       {
         path: "agents",
         element: (

@@ -1,9 +1,5 @@
 {
-  "_doc": "Demo job-application tracker for the Applications tab. Synthetic rows.",
-  "applications": [
-    { "company": "Acme", "role": "Senior Frontend Engineer", "status": "interview", "date": "2026-05-28", "url": "https://example.com/acme/job" },
-    { "company": "Helios", "role": "Platform Engineer", "status": "applied", "date": "2026-05-25" },
-    { "company": "Demo CRM", "role": "AI Integration Engineer", "status": "offer", "date": "2026-05-20" },
-    { "company": "Northwind", "role": "Full-Stack Developer", "status": "rejected", "date": "2026-05-15" }
-  ]
+  "_schema": "servari.applications.v1",
+  "updated_at": "2026-06-20T22:17:28+00:00",
+  "applications": []
 }

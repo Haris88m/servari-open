@@ -21,7 +21,7 @@ const PORT = (() => {
 const URL = `http://${HOST}:${PORT}/`;
 
 // --- home resolution -------------------------------------------------------------------------
-// Order: SERVARI_HOME env -> dev-relative (running from the repo, electron/ -> ..).
+// Order: SERVARI_HOME env -> portable exe location -> dev-relative -> cwd.
 // A "home" is any directory that contains server/servari_server.py.
 function isHome(p) {
   try {
@@ -30,14 +30,28 @@ function isHome(p) {
     return false;
   }
 }
+function candidateDirsFrom(p) {
+  if (!p) return [];
+  const base = path.resolve(p);
+  return [base, path.resolve(base, ".."), path.resolve(base, "..", "..")];
+}
 function resolveHome() {
   if (process.env.SERVARI_HOME && isHome(process.env.SERVARI_HOME)) return process.env.SERVARI_HOME;
+  const portableDirs = [
+    ...candidateDirsFrom(process.env.PORTABLE_EXECUTABLE_DIR),
+    ...candidateDirsFrom(process.env.PORTABLE_EXECUTABLE_FILE ? path.dirname(process.env.PORTABLE_EXECUTABLE_FILE) : ""),
+  ];
+  for (const p of portableDirs) {
+    if (isHome(p)) return p;
+  }
   // electron/main.cjs lives one level below the repo root.
   const repoRoot = path.resolve(__dirname, "..");
   if (isHome(repoRoot)) return repoRoot;
-  // also try the current working directory (when launched from the repo root).
+  // also try the current working directory (or its parents, when launched from dist-exe).
   const cwd = process.cwd();
-  if (isHome(cwd)) return cwd;
+  for (const p of candidateDirsFrom(cwd)) {
+    if (isHome(p)) return p;
+  }
   return null;
 }
 const ROOT = resolveHome();
@@ -49,6 +63,18 @@ function resolvePython() {
   try {
     if (configured && fs.existsSync(configured)) return configured;
   } catch (_) {}
+  const candidates = [
+    ROOT ? path.join(ROOT, ".venv", "Scripts", "python.exe") : "",
+    ROOT ? path.join(ROOT, "venv", "Scripts", "python.exe") : "",
+    process.env.LOCALAPPDATA
+      ? path.join(process.env.LOCALAPPDATA, "hermes", "hermes-agent", "venv", "Scripts", "python.exe")
+      : "",
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (candidate && fs.existsSync(candidate)) return candidate;
+    } catch (_) {}
+  }
   return "python";
 }
 

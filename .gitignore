@@ -32,6 +32,8 @@ verification/
 # --- runtime demo state written by the running shell ---
 demo-data/context/audit.jsonl
 demo-data/_voice_debug.jsonl
+demo-data/engine-executed.jsonl
+demo-data/retention/runs/run_*/
 demo-data/reports/*_session_*.md
 demo-data/reports/*_today.md
 # dated all-time reports are per-run artifacts; keep only the one curated demo report
@@ -40,7 +42,18 @@ demo-data/reports/*_all_time.md
 
 # --- logs ---
 *.log
+*.err
 _smoke_server.log
+live-server.log
+
+# --- stray test/runtime artifacts ---
+test-results/
+openclaw-workspace/
+verification/_verify_home/
+
+# --- local browser verification artifacts ---
+.playwright-cli/
+output/
 
 # --- OS / editor ---
 .DS_Store

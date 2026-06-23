@@ -21,6 +21,7 @@ This source repository covers the public shell/control-plane scope:
 
 - local server on `127.0.0.1` by default,
 - React UI intended to render from bundled synthetic demo data,
+- file-backed local agent roster and workflow-lane surfaces,
 - OpenAI-compatible BYOM chat interface,
 - no-config BYOM behavior that refuses to fabricate a model reply,
 - L0-L5 autonomy decision policy,
@@ -87,7 +88,7 @@ See [`./docs/screenshots/`](./docs/screenshots/) for the full set.
 
 - **Bring your own model (BYOM).** Point SERVARI at any OpenAI-compatible chat endpoint — OpenAI, OpenRouter, Together, Ollama, LM Studio, vLLM, or similar. Your provider config lives in gitignored `config.json`.
 - **Gate-controlled autonomy.** A per-agent dial from **L0** to **L5**. Higher levels widen what an agent may do on safe work, but high-risk work parks in the fast-verify queue at every level.
-- **Live workspace surface.** Agent channels, org chart, process-table overlay, launch ladder, and panels render from demo data out of the box.
+- **Live workspace surface.** A 51-agent synthetic local roster, channel logs, workflow lanes, org chart, process-table overlay, launch ladder, and panels render from demo data out of the box.
 - **Reliability panels.** Fail-closed health surface, context-pressure policy, token tracker, and metric-gated retention loop.
 - **Optional voice skeleton.** Local STT/TTS integration points are present; the shell runs fine without voice packages.
 - **Display seal.** Configurable UI label mapping and denylist for product-facing chrome.
@@ -105,16 +106,18 @@ SERVARI ships a bundled runtime-control surface at `/shell/runtime` and exposes 
 
 The `EngineRuntimeView` panel uses these endpoints to manage a local subprocess (start/stop/restart), read status, and stream recent logs. These routes are served by the same Python shell process that serves the UI on the same host.
 
-### Runtime behavior for the downloaded exe
+### Runtime behavior for the Windows launcher
 
-When a user installs/runs the Windows executable in this repo:
+When a user runs the Windows executable built from this repo:
 
-1. The embedded shell server binds to localhost by default (`127.0.0.1:8911`) and serves `ui/dist/`.
-2. The Electron window points only at that local URL.
-3. Runtime control routes start/stop a process on the same machine the Servari shell is running on.
-4. Nothing in the current architecture makes the downloaded exe connect automatically to `mine` / another machine.
+1. The `.exe` is an Electron launcher, not a standalone Python/server bundle.
+2. It resolves a SERVARI project home from `SERVARI_HOME`, the portable executable location, or the current working directory.
+3. From that project home it starts `server/servari_server.py`, which binds to localhost by default (`127.0.0.1:8911`) and serves `ui/dist/`.
+4. The Electron window points only at that local URL.
+5. Runtime control routes start/stop a process on the same machine the Servari shell is running on.
+6. Nothing in the current architecture makes the downloaded exe connect automatically to `mine` / another machine.
 
-If a user has not manually configured different hosts, all traffic remains local-first by default.
+If a user has not manually configured different hosts, all traffic remains local-first by default. If the launcher is moved away from the repo/distribution folder, set `SERVARI_HOME` to the folder that contains `server/servari_server.py`.
 
 ---
 
@@ -145,7 +148,7 @@ python server/servari_server.py
 # -> open http://127.0.0.1:8911/
 ```
 
-The dashboard, agent grid, org chart, gates, and panels render from bundled demo data immediately.
+The dashboard, 51-agent workspace, workflow lanes, org chart, gates, and panels render from bundled demo data immediately.
 
 ### Run as a desktop app (optional)
 
@@ -289,6 +292,8 @@ python demo-data/_seed.py
 ```
 
 To wire your own data, edit the files in `demo-data/` or point `SERVARI_HOME` at your own directory with the same shapes.
+
+The local agent workspace is file-backed: `demo-data/agents.json` defines the visible roster, `demo-data/agents/<id>/channel.jsonl` stores each synthetic channel, `demo-data/agents/<id>/START.md` stores each brief, and `demo-data/agent-workflows.json` drives the workflow-lane cards. These files describe the workspace surface; they are not a shipped autonomous execution engine.
 
 ---
 

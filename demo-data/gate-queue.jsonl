@@ -2,3 +2,5 @@
 {"id": "39a0f1984f", "ts": "2026-06-02T13:36:35+00:00", "agent": "researcher", "gate": "real-send", "action": "send outreach email", "summary": "Send a drafted intro email to a demo contact", "detail": "To: demo@example.com — subject: Hello", "rollback": "None (send is irreversible) — that is why it is gated", "status": "pending"}
 {"id": "ecf97273af", "ts": "2026-06-02T13:06:35+00:00", "agent": "scheduler", "gate": "publish", "action": "publish weekly report", "summary": "Publish the weekly report to the demo blog", "detail": "Markdown report, ~400 words", "rollback": "Unpublish the post", "status": "pending"}
 {"id": "ecf97273af", "ts": "2026-06-02T13:11:35+00:00", "type": "decision", "decision": "approve", "status": "approved", "note": "Looks good — ship it."}
+{"id": "964f04cfe8", "ts": "2026-06-20T03:12:22+00:00", "type": "decision", "decision": "approve", "status": "approved", "note": "via SERVARI OS"}
+{"id": "39a0f1984f", "ts": "2026-06-20T03:12:23+00:00", "type": "decision", "decision": "approve", "status": "approved", "note": "via SERVARI OS"}

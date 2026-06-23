@@ -1,0 +1,2 @@
+{"turn":1,"from":"operator","text":"Watch the server and browser route health during final verification.","ts":"2026-06-20T02:25:00+00:00"}
+{"turn":2,"from":"runtime-watch","text":"Runtime watch is queued for final smoke: /api/agents/status, /api/agent-workflows, /shell/agents, /shell/chat, and /shell/runtime.","ts":"2026-06-20T02:29:00+00:00"}
