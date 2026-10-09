@@ -4,7 +4,7 @@ This register is the public boundary for what the `servari-open` repository prov
 
 Labels:
 
-- **VERIFIED** — inspectable in this repository and/or exercised by `python scripts/verify_all.py`, the pytest suite (`python -m pytest tests/ -q`, 145 tests), or CI.
+- **VERIFIED** — inspectable in this repository and/or exercised by `python scripts/verify_all.py`, the pytest suite (`python -m pytest tests/ -q`, 384 tests as of 9 October 2026), or CI. Counts include parametrized policy inputs; they are not a production-readiness score.
 - **PARTIAL** — present as a surface, skeleton, or documented pathway, but not fully proven by the public verification harness.
 - **UNVERIFIED / NOT SHIPPED** — not present as runnable behavior in this repository.
 
@@ -42,3 +42,14 @@ The strongest accurate public claim is:
 ## Current public non-claim
 
 The repository does not claim to ship a fully autonomous multi-agent execution engine, a new foundation model, AGI, or third-party certification.
+
+## Risk-score input contract
+
+The policy accepts integer risk scores from 4 through 20 only. Direct callers
+must supply a numeric integer, not a numeric string, boolean or floating-point
+value. Missing, wrong-type and out-of-range inputs return an `invalid` band and
+queue for human review at every autonomy level. The CLI parses its textual
+integer argument once before calling this policy; fractional text is rejected.
+The tests pin every valid score at every level and malformed-domain regressions.
+This validates the input boundary, not the correctness of an upstream risk
+assessment or compliance of an external action executor.

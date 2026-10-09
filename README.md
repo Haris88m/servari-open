@@ -328,7 +328,15 @@ Source code is licensed under [Apache License 2.0](./LICENSE) © The SERVARI OS 
 
 ## Built with Claude
 
-SERVARI OS was engineered by Haris Mekic (MEKreflect) and built end-to-end with [Claude](https://claude.com/claude-code) (Anthropic) — Claude Code as the engineering agent, working under a human-gated, verification-first workflow: the same operator discipline SERVARI itself enforces. The architecture, the L0–L5 autonomy policy, and the consume-first design are the author's; Claude wrote, tested, and mechanically verified the code under that direction (`scripts/verify_all.py`, 160-test suite, CI).
+SERVARI OS was engineered by Haris Mekic (MEKreflect) and built end-to-end with [Claude](https://claude.com/claude-code) (Anthropic) — Claude Code as the engineering agent, working under a human-gated, verification-first workflow: the same operator discipline SERVARI itself enforces. The architecture, the L0–L5 autonomy policy, and the consume-first design are the author's; Claude wrote, tested, and mechanically verified the initial code under that direction (`scripts/verify_all.py`, Python test suite, CI).
+
+On 9 October 2026, an owner-directed Codex review hardened the risk-score input
+boundary. A clean local checkout passed 384 Python tests and eight separate
+verification checks. The test count includes 224 added parametrized boundary,
+malformed-input and CLI regressions; it is not a production-readiness score.
+No hosted model was called, and the verification smoke server uses isolated
+synthetic data. Current local checks do not certify internet-facing security,
+upstream risk classification or external executor compliance.
 
 ---
 

@@ -6,7 +6,7 @@ A continuous autonomy dial, L0 -> L5, PER AGENT. The dial sets the THRESHOLD
 at which an agent ACTS silently vs SURFACES for human approval. It composes:
 
   (a) the agent's autonomy LEVEL (L0-L5, the operator's dial), and
-  (b) a risk SCORE (4-20; lower = safer — e.g. reversibility x blast-radius x
+  (b) an integer risk SCORE (4-20; lower = safer — e.g. reversibility x blast-radius x
       data-loss x certainty)
 
 ...into one verdict: "act" | "report" | "queue".
@@ -218,16 +218,18 @@ def level_definitions():
 
 
 def _score_band(score):
-    """Map a risk score to its band label. Out-of-range clamps."""
-    try:
-        s = int(score)
-    except (TypeError, ValueError):
+    """Map an integer score in 4..20 to its band; invalid input stays invalid.
+
+    Do not coerce a string, bool or float into authority. bool is an int
+    subclass, so an isinstance check alone would accept True and False.
+    """
+    if type(score) is not int or not SCORE_MIN <= score <= SCORE_MAX:
         return "invalid"
-    if s <= BAND_SILENT_MAX:
+    if score <= BAND_SILENT_MAX:
         return "silent"
-    if s <= BAND_NOTICE_MAX:
+    if score <= BAND_NOTICE_MAX:
         return "notice"
-    if s <= BAND_ASK_MAX:
+    if score <= BAND_ASK_MAX:
         return "ask"
     return "refuse"
 
@@ -247,17 +249,20 @@ def decide(agent, score):
     is ABOVE every level's act_report_max, so it ALWAYS queues. The dial can
     widen the silent/report band but can NEVER auto-cross the hard human gate.
 
-    Invalid/missing score -> queue (fail-closed)."""
+    Only integer scores in 4..20 are accepted. Missing, out-of-range or
+    wrong-type scores -> queue (fail-closed), without numeric coercion.
+    The CLI parses its textual integer argument at the command boundary.
+    """
     level = get_level(agent)
     spec = LEVELS.get(level, LEVELS[DEFAULT_LEVEL])
     band = _score_band(score)
 
-    try:
-        s = int(score)
-    except (TypeError, ValueError):
+    if band == "invalid":
         return {"verdict": "queue", "agent": str(agent), "level": level,
                 "level_name": spec["name"], "score": score, "score_band": "invalid",
                 "reason": "invalid_score_fail_closed_to_queue"}
+
+    s = score
 
     silent_ceiling = spec["act_silent_max"]
     report_ceiling = spec["act_report_max"]
@@ -315,7 +320,13 @@ def main(argv=None):
         return 0
 
     if args.decide is not None:
-        agent, score = args.decide
+        agent, raw_score = args.decide
+        # Command arguments are text, but the policy accepts integers only.
+        # Parse once here; fractional/non-integer text remains invalid input.
+        try:
+            score = int(raw_score)
+        except (TypeError, ValueError):
+            score = raw_score
         result = decide(agent, score)
         _emit(result, args.pretty)
         # exit 0 for act/report (autonomous), exit 2 for queue (needs human) —

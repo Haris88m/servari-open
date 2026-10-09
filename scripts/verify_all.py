@@ -149,12 +149,16 @@ def check_autonomy_l5_high_risk() -> Dict[str, Any]:
 
 
 def check_autonomy_invalid_fails_closed() -> Dict[str, Any]:
+    invalid_scores = [None, "not-a-score", "4", "20", False, True,
+                      -1, 0, 3, 21, 3.5, 4.0, [], {}]
     with _env(SERVARI_HOME=str(TEST_HOME)):
         autonomy = _reload("autonomy")
-        result = autonomy.decide("verify-agent", "not-a-score")
-    assert result.get("verdict") == "queue", result
-    assert result.get("score_band") == "invalid", result
-    return result
+        assert autonomy.set_level("verify-agent", 5).get("ok") is True
+        results = [autonomy.decide("verify-agent", score) for score in invalid_scores]
+    for result in results:
+        assert result.get("verdict") == "queue", result
+        assert result.get("score_band") == "invalid", result
+    return {"inputs_checked": len(results), "level": 5, "results": results}
 
 
 def check_verify_queue_append_only() -> Dict[str, Any]:

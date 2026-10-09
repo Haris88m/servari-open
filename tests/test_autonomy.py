@@ -91,6 +91,68 @@ def test_invalid_score_fails_closed_to_queue(autonomy, bad_score):
     assert "fail_closed" in result["reason"]
 
 
+@pytest.mark.parametrize("level", range(6))
+@pytest.mark.parametrize("bad_score", [
+    pytest.param(None, id="missing"),
+    pytest.param("4", id="numeric-string-min"),
+    pytest.param("20", id="numeric-string-max"),
+    pytest.param("not-a-score", id="text"),
+    pytest.param(False, id="false-is-not-zero"),
+    pytest.param(True, id="true-is-not-one"),
+    pytest.param(-1, id="negative"),
+    pytest.param(0, id="zero"),
+    pytest.param(3, id="below-minimum"),
+    pytest.param(21, id="above-maximum"),
+    pytest.param(2 ** 63, id="large-integer"),
+    pytest.param(3.5, id="fractional-below-minimum"),
+    pytest.param(4.5, id="fractional-inside-range"),
+    pytest.param(4.0, id="float-integer"),
+    pytest.param(float("nan"), id="nan"),
+    pytest.param(float("inf"), id="positive-infinity"),
+    pytest.param(float("-inf"), id="negative-infinity"),
+    pytest.param([], id="list"),
+    pytest.param({}, id="object"),
+])
+def test_invalid_numeric_domain_never_acts_at_any_level(autonomy, level, bad_score):
+    """Only integer scores 4..20 are policy inputs; never coerce authority."""
+    autonomy.set_level("domain-agent", level)
+    result = autonomy.decide("domain-agent", bad_score)
+    assert result["verdict"] == "queue", result
+    assert result["score_band"] == "invalid", result
+    assert "fail_closed" in result["reason"]
+    assert autonomy._score_band(bad_score) == "invalid"
+
+
+@pytest.mark.parametrize("level", range(6))
+@pytest.mark.parametrize("score", range(4, 21))
+def test_valid_integer_domain_preserves_every_level_verdict(autonomy, level, score):
+    """Pin every permitted input, including both bounds and band crossings."""
+    autonomy.set_level("valid-domain-agent", level)
+    if level in (0, 1):
+        expected = "queue"
+    elif level == 2:
+        expected = "report" if score <= 8 else "queue"
+    elif level == 3:
+        expected = "report" if score <= 12 else "queue"
+    elif level == 4:
+        expected = "act" if score <= 8 else "report" if score <= 12 else "queue"
+    else:
+        expected = "act" if score <= 16 else "queue"
+    result = autonomy.decide("valid-domain-agent", score)
+    assert result["verdict"] == expected, result
+    assert result["score"] == score
+    assert result["score_band"] != "invalid"
+
+
+@pytest.mark.parametrize("raw_score", ["3", "21", "3.5", "4.0", "True", "not-a-score", "nan", "inf"])
+def test_cli_invalid_scores_queue_without_coercing_fractional_values(autonomy, capsys, raw_score):
+    autonomy.set_level("cli-domain-agent", 5)
+    assert autonomy.main(["--decide", "cli-domain-agent", raw_score]) == 2
+    result = json.loads(capsys.readouterr().out.strip())
+    assert result["verdict"] == "queue"
+    assert result["score_band"] == "invalid"
+
+
 def test_missing_state_file_yields_default_level(autonomy, servari_home):
     assert not (servari_home / "demo-data" / "autonomy-levels.json").exists()
     assert autonomy.get_level("never-seen-agent") == autonomy.DEFAULT_LEVEL == 2
