@@ -10,12 +10,14 @@
 ![Local-first](https://img.shields.io/badge/local--first-127.0.0.1-lightgrey)
 [![Built with Claude](https://img.shields.io/badge/built%20with-Claude%20(Anthropic)-d97757)](https://claude.com/claude-code)
 
-### An AI operator you can actually trust.
+### A local workspace for models, procedures and human review.
+
+Created by Haris Mekic as part of the implementation work behind [MEKreflect](https://mekreflect.com/). This repository retains the public reference shell and its reproducible examples; the company research site explains the wider operational questions and evaluation work.
 
 **SERVARI OS is an open-source, local-first BYOM agentic OS shell** — the shell and control plane for AI agents: your model, your machine, your gates. The intelligence is whatever you wire in through an OpenAI-compatible endpoint (hosted or local); the shell is what you see, control, verify, and audit. It gives operators a controlled workspace for AI agents: chat, agent grid, autonomy dials, human verification queue, fail-closed health, token tracking, and metric-gated retention — all running locally.
 
 - **Autonomy is a dial, not a switch.** A per-agent dial from **L0 to L5**. Higher levels widen what an agent may do on safe work — but high-risk actions (deploy, real-send, spend, publish, merge, secrets) park in the verification queue at every level, including L5.
-- **Every gate decision is append-only.** Pending events and decisions are written as separate JSONL lines. Nothing executes until you approve.
+- **Every gate decision is append-only.** Pending events and decisions are written as separate JSONL lines. Queued operations require a recorded review decision; a policy decision is distinct from an action completing successfully.
 - **Honest by design.** No model configured? It says so and records your turn — it never fabricates a reply.
 - **Local-first by default.** The server binds to `127.0.0.1`; your provider config lives in a gitignored `config.json`.
 - **Mechanically verified.** `python scripts/verify_all.py` checks the public claims — expected result: `PASS (8/8)`.
